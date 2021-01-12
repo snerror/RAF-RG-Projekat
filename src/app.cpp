@@ -13,8 +13,8 @@
 
 const unsigned int SCR_WIDTH = 800;
 const unsigned int SCR_HEIGHT = 600;
+const float SIZE = 10000;
 const float VERTEX_COUNT = 500;
-
 
 Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
 
@@ -36,6 +36,8 @@ float meshHeight = 32;
 float noiseScale = 64;
 float persistence = 0.5;
 float lacunarity = 2;
+
+glm::vec3 lightPos(1.2f, 1.0f, 2.0f);
 
 void initGlfw();
 
@@ -65,9 +67,11 @@ std::vector<float> generate_vertices(const std::vector<float> &noise_map);
 
 std::vector<float> generate_normals(const std::vector<int> &indices, const std::vector<float> &vertices);
 
-std::vector<float> generate_biome(const std::vector<float> &vertices, int xOffset, int yOffset);
+std::vector<float> generate_biome(const std::vector<float> &vertices);
 
-void generate_map_chunk(GLuint &VAO, std::vector<int> &indices, int xOffset, int yOffset);
+std::vector<float> generate_texture_coords(std::vector<float> vertices);
+
+void generate_map_chunk(unsigned int &VAO);
 
 int main() {
     initGlfw();
@@ -100,13 +104,22 @@ int main() {
 
     // TERRAIN
     unsigned int terrainVAO;
-    std::vector<int> terrainIndices;
-    generate_map_chunk(terrainVAO, terrainIndices, 0, 0);
+    generate_map_chunk(terrainVAO);
 
 
     // CUBE
     unsigned int cubeVAO, cubeVBO;
     createCube(cubeVAO, cubeVBO);
+    Shader terrainShader(
+            "../../resources/shaders/terrain.vert",
+            "../../resources/shaders/terrain.frag"
+    );
+    terrainShader.use();
+    terrainShader.setBool("isFlat", true);
+    terrainShader.setVec3("light.ambient", 0.2, 0.2, 0.2);
+    terrainShader.setVec3("light.diffuse", 0.3, 0.3, 0.3);
+    terrainShader.setVec3("light.specular", 1.0, 1.0, 1.0);
+    terrainShader.setVec3("light.direction", -0.2f, -1.0f, -0.3f);
 
     // SKYBOX
     unsigned int skyboxTexture, skyboxVAO, skyboxVBO;
@@ -119,13 +132,13 @@ int main() {
     skyboxShader.setInt("skybox", 0);
 
 //    LIGHT
-    Shader lightShader(
-            "../../resources/shaders/light.vert",
-            "../../resources/shaders/light.frag"
-    );
-    lightShader.use();
-    lightShader.setInt("material.diffuse", 0);
-    lightShader.setInt("material.specular", 1);
+//    Shader lightShader(
+//            "../../resources/shaders/basic.vert",
+//            "../../resources/shaders/basic.frag"
+//    );
+//    lightShader.use();
+//    lightShader.setInt("material.diffuse", 0);
+//    lightShader.setInt("material.specular", 1);
 
 //    RENDER LOOP
     while (!glfwWindowShouldClose(window)) {
@@ -138,23 +151,18 @@ int main() {
         processInput(window);
 
         // RENDER
-//        glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         glClearColor(0.4f, 0.4f, 0.4f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        // LIGHT
-        lightShader.use();
-        lightningShaderSettings(lightShader);
+        terrainShader.use();
 
-        // view/projection transformations
         glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float) SCR_WIDTH / (float) SCR_HEIGHT, 0.1f,
                                                 100.0f);
         glm::mat4 view = camera.GetViewMatrix();
         glm::mat4 model = glm::mat4(1.0f);
-
-        // world transformation
-        lightShader.setMat4("projection", projection);
-        lightShader.setMat4("view", view);
+        terrainShader.setMat4("u_projection", projection);
+        terrainShader.setMat4("u_view", view);
+        terrainShader.setVec3("u_viewPos", camera.Position);
 
 //        TERRAIN
         model = glm::mat4(1.0f);
@@ -164,13 +172,10 @@ int main() {
                 -VERTEX_COUNT / 2.0 + (VERTEX_COUNT - 1) * 0
                                )
         );
+        terrainShader.setMat4("u_model", model);
 
-        lightShader.setMat4("model", model);
-
-//        glActiveTexture(GL_TEXTURE0);
-//        glBindTexture(GL_TEXTURE_2D, grassTexture);
         glBindVertexArray(terrainVAO);
-        glDrawElements(GL_TRIANGLES, terrainIndices.size(), GL_UNSIGNED_INT, nullptr);
+        glDrawElements(GL_TRIANGLES, VERTEX_COUNT * VERTEX_COUNT * 6, GL_UNSIGNED_INT, nullptr);
 
         // CUBE
 //        glActiveTexture(GL_TEXTURE0);
@@ -444,63 +449,12 @@ void createSkybox(unsigned int &texture, unsigned int &VAO, unsigned int &VBO) {
 }
 
 void lightningShaderSettings(Shader &lightingShader) {
-    glm::vec3 pointLightPositions[] = {
-            glm::vec3(0.7f, 0.2f, 2.0f),
-            glm::vec3(2.3f, -3.3f, -4.0f),
-            glm::vec3(-4.0f, 2.0f, -12.0f),
-            glm::vec3(0.0f, 0.0f, -3.0f)
-    };
-
+    lightingShader.setVec3("light.position", lightPos);
     lightingShader.setVec3("viewPos", camera.Position);
-    lightingShader.setFloat("material.shininess", 32.0f);        // light properties
-    // directional light
-    lightingShader.setVec3("dirLight.direction", -0.2f, -1.0f, -0.3f);
-    lightingShader.setVec3("dirLight.ambient", 0.05f, 0.05f, 0.05f);
-    lightingShader.setVec3("dirLight.diffuse", 0.4f, 0.4f, 0.4f);
-    lightingShader.setVec3("dirLight.specular", 0.5f, 0.5f, 0.5f);
-    // point light 1
-    lightingShader.setVec3("pointLights[0].position", pointLightPositions[0]);
-    lightingShader.setVec3("pointLights[0].ambient", 0.05f, 0.05f, 0.05f);
-    lightingShader.setVec3("pointLights[0].diffuse", 0.8f, 0.8f, 0.8f);
-    lightingShader.setVec3("pointLights[0].specular", 1.0f, 1.0f, 1.0f);
-    lightingShader.setFloat("pointLights[0].constant", 1.0f);
-    lightingShader.setFloat("pointLights[0].linear", 0.09);
-    lightingShader.setFloat("pointLights[0].quadratic", 0.032);
-    // point light 2
-    lightingShader.setVec3("pointLights[1].position", pointLightPositions[1]);
-    lightingShader.setVec3("pointLights[1].ambient", 0.05f, 0.05f, 0.05f);
-    lightingShader.setVec3("pointLights[1].diffuse", 0.8f, 0.8f, 0.8f);
-    lightingShader.setVec3("pointLights[1].specular", 1.0f, 1.0f, 1.0f);
-    lightingShader.setFloat("pointLights[1].constant", 1.0f);
-    lightingShader.setFloat("pointLights[1].linear", 0.09);
-    lightingShader.setFloat("pointLights[1].quadratic", 0.032);
-    // point light 3
-    lightingShader.setVec3("pointLights[2].position", pointLightPositions[2]);
-    lightingShader.setVec3("pointLights[2].ambient", 0.05f, 0.05f, 0.05f);
-    lightingShader.setVec3("pointLights[2].diffuse", 0.8f, 0.8f, 0.8f);
-    lightingShader.setVec3("pointLights[2].specular", 1.0f, 1.0f, 1.0f);
-    lightingShader.setFloat("pointLights[2].constant", 1.0f);
-    lightingShader.setFloat("pointLights[2].linear", 0.09);
-    lightingShader.setFloat("pointLights[2].quadratic", 0.032);
-    // point light 4
-    lightingShader.setVec3("pointLights[3].position", pointLightPositions[3]);
-    lightingShader.setVec3("pointLights[3].ambient", 0.05f, 0.05f, 0.05f);
-    lightingShader.setVec3("pointLights[3].diffuse", 0.8f, 0.8f, 0.8f);
-    lightingShader.setVec3("pointLights[3].specular", 1.0f, 1.0f, 1.0f);
-    lightingShader.setFloat("pointLights[3].constant", 1.0f);
-    lightingShader.setFloat("pointLights[3].linear", 0.09);
-    lightingShader.setFloat("pointLights[3].quadratic", 0.032);
-    // spotLight
-    lightingShader.setVec3("spotLight.position", camera.Position);
-    lightingShader.setVec3("spotLight.direction", camera.Front);
-    lightingShader.setVec3("spotLight.ambient", 0.0f, 0.0f, 0.0f);
-    lightingShader.setVec3("spotLight.diffuse", 1.0f, 1.0f, 1.0f);
-    lightingShader.setVec3("spotLight.specular", 1.0f, 1.0f, 1.0f);
-    lightingShader.setFloat("spotLight.constant", 1.0f);
-    lightingShader.setFloat("spotLight.linear", 0.09);
-    lightingShader.setFloat("spotLight.quadratic", 0.032);
-    lightingShader.setFloat("spotLight.cutOff", glm::cos(glm::radians(0.0)));
-    lightingShader.setFloat("spotLight.outerCutOff", glm::cos(glm::radians(0.0f)));
+    lightingShader.setVec3("light.ambient", 0.2f, 0.2f, 0.2f);
+    lightingShader.setVec3("light.diffuse", 0.5f, 0.5f, 0.5f);
+    lightingShader.setVec3("light.specular", 1.0f, 1.0f, 1.0f);
+    lightingShader.setFloat("material.shininess", 64.0f);
 }
 
 std::vector<int> generate_indices() {
@@ -536,7 +490,7 @@ float randomModifier() {
     return modifier + 1.0f;
 }
 
-std::vector<float> generate_noise_map(int offsetX, int offsetY) {
+std::vector<float> generate_noise_map(int offsetX = 0, int offsetY = 0) {
     std::vector<float> noiseValues;
     std::vector<float> normalizedNoiseValues;
     std::vector<int> p = get_permutation_vector();
@@ -642,7 +596,8 @@ struct terrainColor {
     glm::vec3 color;
 };
 
-std::vector<float> generate_biome(const std::vector<float> &vertices, int xOffset, int yOffset) {
+std::vector<float>
+generate_biome(const std::vector<float> &vertices) {
     std::vector<float> colors;
     std::vector<terrainColor> biomeColors;
     glm::vec3 color = get_color(255, 255, 255);
@@ -657,9 +612,13 @@ std::vector<float> generate_biome(const std::vector<float> &vertices, int xOffse
     biomeColors.push_back(terrainColor(0.80, get_color(75, 60, 55)));                // Rock 2
     biomeColors.push_back(terrainColor(1.00, get_color(255, 255, 255)));                // Snow
 
-    std::string plantType;
-
     for (int i = 1; i < vertices.size(); i += 3) {
+        for (int j = 0; j < biomeColors.size(); j++) {
+            if (vertices[i] <= biomeColors[j].height * meshHeight) {
+                color = biomeColors[j].color;
+                break;
+            }
+        }
         colors.push_back(color.r);
         colors.push_back(color.g);
         colors.push_back(color.b);
@@ -667,18 +626,41 @@ std::vector<float> generate_biome(const std::vector<float> &vertices, int xOffse
     return colors;
 }
 
-void generate_map_chunk(unsigned int &VAO, std::vector<int> &indices, int xOffset, int yOffset) {
+std::vector<float> generate_texture_coords(std::vector<float> vertices) {
+    std::vector<float> textureCoords(VERTEX_COUNT * VERTEX_COUNT * 2);
+
+    int vertexPointer = 0;
+    for (float i = 0; i < VERTEX_COUNT; i++) { // z
+        for (float j = 0; j < VERTEX_COUNT; j++) { // x
+            //vertices[vertexPointer * 3] = j * 2;
+            vertices[vertexPointer * 3] = (float) j / ((float) VERTEX_COUNT - 1) * SIZE;
+            vertices[vertexPointer * 3 + 1] = 0;
+            vertices[vertexPointer * 3 + 2] = (float) i / ((float) VERTEX_COUNT - 1) * SIZE;
+            //vertices[vertexPointer * 3 + 2] = i * 2;
+
+            textureCoords[vertexPointer * 2] = (float) j / ((float) VERTEX_COUNT - 1);
+            textureCoords[vertexPointer * 2 + 1] = (float) i / ((float) VERTEX_COUNT - 1);
+            vertexPointer++;
+        }
+    }
+    return textureCoords;
+}
+
+void generate_map_chunk(unsigned int &VAO) {
+    std::vector<int> indices;
     std::vector<float> noise_map;
     std::vector<float> vertices;
     std::vector<float> normals;
     std::vector<float> colors;
+    std::vector<float> textureCoords;
 
     // Generate map
     indices = generate_indices();
-    noise_map = generate_noise_map(xOffset, yOffset);
+    noise_map = generate_noise_map();
     vertices = generate_vertices(noise_map);
     normals = generate_normals(indices, vertices);
-    colors = generate_biome(vertices, xOffset, yOffset);
+    colors = generate_biome(vertices);
+    textureCoords = generate_texture_coords(vertices);
 
     unsigned int pVBO, nVBO, cVBO, EBO;
 
@@ -699,23 +681,29 @@ void generate_map_chunk(unsigned int &VAO, std::vector<int> &indices, int xOffse
     // position
     glBindBuffer(GL_ARRAY_BUFFER, pVBO);
     glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), &vertices[0], GL_STATIC_DRAW);
-    glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), 0);
+    glEnableVertexAttribArray(0);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
-
 
     // normals
     glBindBuffer(GL_ARRAY_BUFFER, nVBO);
     glBufferData(GL_ARRAY_BUFFER, normals.size() * sizeof(float), &normals[0], GL_STATIC_DRAW);
-    glEnableVertexAttribArray(1);
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void *) 0);
+    glEnableVertexAttribArray(1);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 
-//    // Bind vertices to VBO
+//    // texture
+//    glBindBuffer(GL_ARRAY_BUFFER, cVBO);
+//    glBufferData(GL_ARRAY_BUFFER, textureCoords.size() * sizeof(float), textureCoords.data(), GL_STATIC_DRAW);
+//    glEnableVertexAttribArray(2);
+//    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void *) 0);
+//    glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+    // colors
     glBindBuffer(GL_ARRAY_BUFFER, cVBO);
     glBufferData(GL_ARRAY_BUFFER, colors.size() * sizeof(float), &colors[0], GL_STATIC_DRAW);
-    glEnableVertexAttribArray(2);
     glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void *) 0);
+    glEnableVertexAttribArray(2);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 
     glBindVertexArray(0);
