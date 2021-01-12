@@ -3,12 +3,13 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <iostream>
+#include <random>
 
 #include "stb_image.h"
-
-#include <iostream>
 #include "shader.h"
 #include "camera.h"
+#include "perlin.h"
 
 const unsigned int SCR_WIDTH = 800;
 const unsigned int SCR_HEIGHT = 600;
@@ -27,6 +28,16 @@ float deltaTime = 0.0f;
 float lastFrame = 0.0f;
 
 GLFWwindow *window = nullptr;
+
+// Map params
+float WATER_HEIGHT = 0.1;
+
+// Noise params
+int octaves = 5;
+float meshHeight = 32;  // Vertical scaling
+float noiseScale = 64;  // Horizontal scaling
+float persistence = 0.5;
+float lacunarity = 2;
 
 #define FACTOR 0.35 // Increase to make flatter
 #define AMPLITUDE (400 / FACTOR)
@@ -52,6 +63,16 @@ void createTerrain(unsigned int &VAO, std::vector<unsigned int> &indices);
 void createSkybox(unsigned int &texture, unsigned int &VAO, unsigned int &VBO);
 
 void lightningShaderSettings(Shader &lightingShader);
+
+std::vector<int> generate_indices();
+
+std::vector<float> generate_noise_map(int xOffset, int yOffset);
+
+std::vector<float> generate_vertices(const std::vector<float> &noise_map);
+
+std::vector<float> generate_normals(const std::vector<int> &indices, const std::vector<float> &vertices);
+
+void generate_map_chunk(GLuint &VAO, std::vector<int> &indices, int xOffset, int yOffset);
 
 int main() {
     initGlfw();
@@ -83,15 +104,11 @@ int main() {
 
     // TERRAIN
     unsigned int terrainVAO;
-    std::vector<unsigned int> indices(6 * (VERTEX_COUNT - 1) * (VERTEX_COUNT - 1));
-    createTerrain(terrainVAO, indices);
-    Shader terrainShader(
-            "../../resources/shaders/vertex.vert",
-            "../../resources/shaders/fragment.frag"
-    );
-    terrainShader.use();
+    std::vector<int> terrainIndices;
+    generate_map_chunk(terrainVAO, terrainIndices, 0, 0);
 
-//  CUBE
+
+    // CUBE
     unsigned int cubeVAO, cubeVBO;
     createCube(cubeVAO, cubeVBO);
 
@@ -142,13 +159,20 @@ int main() {
         // world transformation
         lightShader.setMat4("projection", projection);
         lightShader.setMat4("view", view);
-        lightShader.setMat4("model", model);
 
 //        TERRAIN
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, grassTexture);
+        model = glm::mat4(1.0f);
+        model = glm::translate(model, glm::vec3(
+                -VERTEX_COUNT / 2.0 + (VERTEX_COUNT - 1) * 0,
+                -15.0,
+                -VERTEX_COUNT / 2.0 + (VERTEX_COUNT - 1) * 0
+                               )
+        );
+
+        lightShader.setMat4("model", model);
+
         glBindVertexArray(terrainVAO);
-        glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, nullptr);
+        glDrawElements(GL_TRIANGLES, terrainIndices.size(), GL_UNSIGNED_INT, nullptr);
 
         // CUBE
         glActiveTexture(GL_TEXTURE0);
@@ -354,74 +378,6 @@ void createCube(unsigned int &VAO, unsigned int &VBO) {
     glEnableVertexAttribArray(2);
 }
 
-void createTerrain(unsigned int &VAO, std::vector<unsigned int> &indices) {
-    unsigned int pVBO, nVBO, tcVBO, ibo;
-
-    std::vector<float> vertices(VERTEX_COUNT * VERTEX_COUNT * 3);
-    std::vector<float> textureCoords(VERTEX_COUNT * VERTEX_COUNT * 2);
-
-    int vertexPointer = 0;
-    for (float i = 0; i < VERTEX_COUNT; i++) { // z
-        for (float j = 0; j < VERTEX_COUNT; j++) { // x
-//            vertices[vertexPointer * 3] = j * 2;
-            vertices[vertexPointer * 3] = (float) j / ((float) VERTEX_COUNT - 1) * SIZE;
-            vertices[vertexPointer * 3 + 1] = 0;
-            vertices[vertexPointer * 3 + 2] = (float) i / ((float) VERTEX_COUNT - 1) * SIZE;
-//            vertices[vertexPointer * 3 + 2] = i * 2;
-
-            textureCoords[vertexPointer * 2] = (float) j / ((float) VERTEX_COUNT - 1);
-            textureCoords[vertexPointer * 2 + 1] = (float) i / ((float) VERTEX_COUNT - 1);
-            vertexPointer++;
-        }
-    }
-
-    int pointer = 0;
-    for (int gz = 0; gz < VERTEX_COUNT - 1; gz++) {
-        for (int gx = 0; gx < VERTEX_COUNT - 1; gx++) {
-            int topLeft = (gz * VERTEX_COUNT) + gx;
-            int topRight = topLeft + 1;
-            int bottomLeft = ((gz + 1) * VERTEX_COUNT) + gx;
-            int bottomRight = bottomLeft + 1;
-            indices[pointer++] = topLeft;
-            indices[pointer++] = bottomLeft;
-            indices[pointer++] = topRight;
-            indices[pointer++] = topRight;
-            indices[pointer++] = bottomLeft;
-            indices[pointer++] = bottomRight;
-        }
-    }
-
-    glGenVertexArrays(1, &VAO);
-    glGenBuffers(1, &pVBO);
-    glGenBuffers(1, &nVBO);
-    glGenBuffers(1, &tcVBO);
-    glGenBuffers(1, &ibo);
-
-    glBindVertexArray(VAO);
-
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int), indices.data(), GL_STATIC_DRAW);
-
-    // Positions
-    glBindBuffer(GL_ARRAY_BUFFER, pVBO);
-    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), vertices.data(), GL_STATIC_DRAW);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), 0);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-
-    // Tex coords
-    glBindBuffer(GL_ARRAY_BUFFER, tcVBO);
-    glBufferData(GL_ARRAY_BUFFER, textureCoords.size() * sizeof(float), textureCoords.data(), GL_STATIC_DRAW);
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), 0);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-
-    glBindVertexArray(0);
-
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_READ_COLOR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_READ_COLOR);
-}
-
 
 void createSkybox(unsigned int &texture, unsigned int &VAO, unsigned int &VBO) {
     std::vector<std::string> faces{
@@ -547,4 +503,183 @@ void lightningShaderSettings(Shader &lightingShader) {
     lightingShader.setFloat("spotLight.quadratic", 0.032);
     lightingShader.setFloat("spotLight.cutOff", glm::cos(glm::radians(0.0)));
     lightingShader.setFloat("spotLight.outerCutOff", glm::cos(glm::radians(0.0f)));
+}
+
+std::vector<int> generate_indices() {
+    std::vector<int> indices;
+
+    for (int y = 0; y < VERTEX_COUNT; y++)
+        for (int x = 0; x < VERTEX_COUNT; x++) {
+            int pos = x + y * VERTEX_COUNT;
+
+            if (x == VERTEX_COUNT - 1 || y == VERTEX_COUNT - 1) {
+                // Don't create indices for right or top edge
+                continue;
+            } else {
+                // Top left triangle of square
+                indices.push_back(pos + VERTEX_COUNT);
+                indices.push_back(pos);
+                indices.push_back(pos + VERTEX_COUNT + 1);
+                // Bottom right triangle of square
+                indices.push_back(pos + 1);
+                indices.push_back(pos + 1 + VERTEX_COUNT);
+                indices.push_back(pos);
+            }
+        }
+
+    return indices;
+}
+
+float randomModifier() {
+    float modifier = ((float) rand()) / RAND_MAX;
+    srand((unsigned int) time(NULL));
+    modifier = ((float) rand()) / RAND_MAX;
+    modifier = ((float) rand()) / RAND_MAX;
+    return modifier + 1.0f;
+}
+
+std::vector<float> generate_noise_map(int offsetX, int offsetY) {
+    std::vector<float> noiseValues;
+    std::vector<float> normalizedNoiseValues;
+    std::vector<int> p = get_permutation_vector();
+
+    float amp = 1;
+    float freq = 1;
+    float maxPossibleHeight = 0;
+
+    for (int i = 0; i < octaves; i++) {
+        maxPossibleHeight += amp;
+        amp *= persistence;
+    }
+
+    for (int y = 0; y < VERTEX_COUNT; y++) {
+
+        for (int x = 0; x < VERTEX_COUNT; x++) {
+            float modifier = randomModifier();
+            amp = 1;
+            freq = 1;
+            float noiseHeight = 0;
+            for (int i = 0; i < octaves; i++) {
+                float xSample = (x + offsetX * (VERTEX_COUNT - 1)) / noiseScale * freq;
+                float ySample = (y + offsetY * (VERTEX_COUNT - 1)) / noiseScale * freq;
+
+                float perlinValue = perlin_noise(xSample * modifier, ySample * modifier, p);
+                noiseHeight += perlinValue * amp;
+                amp *= persistence;
+                freq *= lacunarity;
+            }
+
+            noiseValues.push_back(noiseHeight);
+        }
+    }
+
+    for (int y = 0; y < VERTEX_COUNT; y++) {
+        for (int x = 0; x < VERTEX_COUNT; x++) {
+            // Inverse lerp and scale values to range from 0 to 1
+            normalizedNoiseValues.push_back((noiseValues[x + y * VERTEX_COUNT] + 1) / maxPossibleHeight);
+        }
+    }
+
+    return normalizedNoiseValues;
+}
+
+std::vector<float> generate_vertices(const std::vector<float> &noise_map) {
+    std::vector<float> v;
+
+    for (int y = 0; y < VERTEX_COUNT + 1; y++)
+        for (int x = 0; x < VERTEX_COUNT; x++) {
+            v.push_back(x);
+            // Apply cubic easing to the noise
+            float easedNoise = std::pow(noise_map[x + y * VERTEX_COUNT] * 1.1, 3);
+            // Scale noise to match meshHeight
+            // Pervent vertex height from being below WATER_HEIGHT
+            v.push_back(std::fmax(easedNoise * meshHeight, WATER_HEIGHT * 0.5 * meshHeight));
+            v.push_back(y);
+        }
+
+    return v;
+}
+
+std::vector<float> generate_normals(const std::vector<int> &indices, const std::vector<float> &vertices) {
+    int pos;
+    glm::vec3 normal;
+    std::vector<float> normals;
+    std::vector<glm::vec3> verts;
+
+    // Get the vertices of each triangle in mesh
+    // For each group of indices
+    for (int i = 0; i < indices.size(); i += 3) {
+
+        // Get the vertices (point) for each index
+        for (int j = 0; j < 3; j++) {
+            pos = indices[i + j] * 3;
+            verts.push_back(glm::vec3(vertices[pos], vertices[pos + 1], vertices[pos + 2]));
+        }
+
+        // Get vectors of two edges of triangle
+        glm::vec3 U = verts[i + 1] - verts[i];
+        glm::vec3 V = verts[i + 2] - verts[i];
+
+        // Calculate normal
+        normal = glm::normalize(-glm::cross(U, V));
+        normals.push_back(normal.x);
+        normals.push_back(normal.y);
+        normals.push_back(normal.z);
+    }
+
+    return normals;
+}
+
+void generate_map_chunk(unsigned int &VAO, std::vector<int> &indices, int xOffset, int yOffset) {
+    std::vector<float> noise_map;
+    std::vector<float> vertices;
+    std::vector<float> normals;
+    std::vector<float> colors;
+
+    // Generate map
+    indices = generate_indices();
+    noise_map = generate_noise_map(xOffset, yOffset);
+    vertices = generate_vertices(noise_map);
+    normals = generate_normals(indices, vertices);
+
+    unsigned int VBO[3], EBO;
+    unsigned int pVBO, nVBO, cVBO;
+
+    // Create buffers and arrays
+    glGenVertexArrays(1, &VAO);
+    glGenBuffers(1, &pVBO);
+    glGenBuffers(1, &nVBO);
+    glGenBuffers(1, &cVBO);
+    glGenBuffers(1, &EBO);
+
+    // Bind vertices to VBO
+    glBindVertexArray(VAO);
+
+    // Create element buffer
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(int), &indices[0], GL_STATIC_DRAW);
+
+    // Configure vertex position attribute
+    glBindBuffer(GL_ARRAY_BUFFER, pVBO);
+    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), &vertices[0], GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), 0);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+
+    // Bind vertices to VBO
+    glBindBuffer(GL_ARRAY_BUFFER, nVBO);
+    glBufferData(GL_ARRAY_BUFFER, normals.size() * sizeof(float), &normals[0], GL_STATIC_DRAW);
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void *) 0);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+//    // Bind vertices to VBO
+//    glBindBuffer(GL_ARRAY_BUFFER, cVBO);
+//    glBufferData(GL_ARRAY_BUFFER, colors.size() * sizeof(float), &colors[0], GL_STATIC_DRAW);
+//    glEnableVertexAttribArray(2);
+//    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void *) 0);
+//    glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+    glBindVertexArray(0);
 }
