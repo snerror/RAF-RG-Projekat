@@ -13,8 +13,6 @@
 
 const unsigned int SCR_WIDTH = 800;
 const unsigned int SCR_HEIGHT = 600;
-const float MAX_PIXEL_COLOR = 256 * 256 * 256;
-const float SIZE = 10000;
 const float VERTEX_COUNT = 500;
 
 
@@ -34,13 +32,10 @@ float WATER_HEIGHT = 0.1;
 
 // Noise params
 int octaves = 5;
-float meshHeight = 32;  // Vertical scaling
-float noiseScale = 64;  // Horizontal scaling
+float meshHeight = 32;
+float noiseScale = 64;
 float persistence = 0.5;
 float lacunarity = 2;
-
-#define FACTOR 0.35 // Increase to make flatter
-#define AMPLITUDE (400 / FACTOR)
 
 void initGlfw();
 
@@ -58,8 +53,6 @@ unsigned int loadCubemap(std::vector<std::string> faces);
 
 void createCube(unsigned int &VAO, unsigned int &VBO);
 
-void createTerrain(unsigned int &VAO, std::vector<unsigned int> &indices);
-
 void createSkybox(unsigned int &texture, unsigned int &VAO, unsigned int &VBO);
 
 void lightningShaderSettings(Shader &lightingShader);
@@ -71,6 +64,8 @@ std::vector<float> generate_noise_map(int xOffset, int yOffset);
 std::vector<float> generate_vertices(const std::vector<float> &noise_map);
 
 std::vector<float> generate_normals(const std::vector<int> &indices, const std::vector<float> &vertices);
+
+std::vector<float> generate_biome(const std::vector<float> &vertices, int xOffset, int yOffset);
 
 void generate_map_chunk(GLuint &VAO, std::vector<int> &indices, int xOffset, int yOffset);
 
@@ -100,6 +95,7 @@ int main() {
     unsigned int diffuseMap = loadTexture("../../resources/textures/container2.png");
     unsigned int specularMap = loadTexture("../../resources/textures/container2_specular.png");
     unsigned int grassTexture = loadTexture("../../resources/textures/grass.png");
+    unsigned int rockTexture = loadTexture("../../resources/textures/mountains.jpg");
     unsigned int heightMap = loadTexture("../../resources/heightmap.bmp");
 
     // TERRAIN
@@ -171,16 +167,18 @@ int main() {
 
         lightShader.setMat4("model", model);
 
+//        glActiveTexture(GL_TEXTURE0);
+//        glBindTexture(GL_TEXTURE_2D, grassTexture);
         glBindVertexArray(terrainVAO);
         glDrawElements(GL_TRIANGLES, terrainIndices.size(), GL_UNSIGNED_INT, nullptr);
 
         // CUBE
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, diffuseMap);
-        glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D, specularMap);
-        glBindVertexArray(cubeVAO);
-        glDrawArrays(GL_TRIANGLES, 0, 36);
+//        glActiveTexture(GL_TEXTURE0);
+//        glBindTexture(GL_TEXTURE_2D, diffuseMap);
+//        glActiveTexture(GL_TEXTURE1);
+//        glBindTexture(GL_TEXTURE_2D, specularMap);
+//        glBindVertexArray(cubeVAO);
+//        glDrawArrays(GL_TRIANGLES, 0, 36);
 
         // SKYBOX
         glDepthFunc(GL_LEQUAL);
@@ -630,6 +628,45 @@ std::vector<float> generate_normals(const std::vector<int> &indices, const std::
     return normals;
 }
 
+glm::vec3 get_color(int r, int g, int b) {
+    return glm::vec3(r / 255.0, g / 255.0, b / 255.0);
+}
+
+
+struct terrainColor {
+    terrainColor(float _height, glm::vec3 _color) {
+        height = _height;
+        color = _color;
+    };
+    float height;
+    glm::vec3 color;
+};
+
+std::vector<float> generate_biome(const std::vector<float> &vertices, int xOffset, int yOffset) {
+    std::vector<float> colors;
+    std::vector<terrainColor> biomeColors;
+    glm::vec3 color = get_color(255, 255, 255);
+
+    // NOTE: Terrain color height is a value between 0 and 1
+    biomeColors.push_back(terrainColor(WATER_HEIGHT * 0.5, get_color(60, 95, 190)));   // Deep water
+    biomeColors.push_back(terrainColor(WATER_HEIGHT, get_color(60, 100, 190)));  // Shallow water
+    biomeColors.push_back(terrainColor(0.15, get_color(210, 215, 130)));                // Sand
+    biomeColors.push_back(terrainColor(0.30, get_color(95, 165, 30)));                // Grass 1
+    biomeColors.push_back(terrainColor(0.40, get_color(65, 115, 20)));                // Grass 2
+    biomeColors.push_back(terrainColor(0.50, get_color(90, 65, 60)));                // Rock 1
+    biomeColors.push_back(terrainColor(0.80, get_color(75, 60, 55)));                // Rock 2
+    biomeColors.push_back(terrainColor(1.00, get_color(255, 255, 255)));                // Snow
+
+    std::string plantType;
+
+    for (int i = 1; i < vertices.size(); i += 3) {
+        colors.push_back(color.r);
+        colors.push_back(color.g);
+        colors.push_back(color.b);
+    }
+    return colors;
+}
+
 void generate_map_chunk(unsigned int &VAO, std::vector<int> &indices, int xOffset, int yOffset) {
     std::vector<float> noise_map;
     std::vector<float> vertices;
@@ -641,9 +678,9 @@ void generate_map_chunk(unsigned int &VAO, std::vector<int> &indices, int xOffse
     noise_map = generate_noise_map(xOffset, yOffset);
     vertices = generate_vertices(noise_map);
     normals = generate_normals(indices, vertices);
+    colors = generate_biome(vertices, xOffset, yOffset);
 
-    unsigned int VBO[3], EBO;
-    unsigned int pVBO, nVBO, cVBO;
+    unsigned int pVBO, nVBO, cVBO, EBO;
 
     // Create buffers and arrays
     glGenVertexArrays(1, &VAO);
@@ -659,7 +696,7 @@ void generate_map_chunk(unsigned int &VAO, std::vector<int> &indices, int xOffse
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(int), &indices[0], GL_STATIC_DRAW);
 
-    // Configure vertex position attribute
+    // position
     glBindBuffer(GL_ARRAY_BUFFER, pVBO);
     glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), &vertices[0], GL_STATIC_DRAW);
     glEnableVertexAttribArray(0);
@@ -667,7 +704,7 @@ void generate_map_chunk(unsigned int &VAO, std::vector<int> &indices, int xOffse
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 
 
-    // Bind vertices to VBO
+    // normals
     glBindBuffer(GL_ARRAY_BUFFER, nVBO);
     glBufferData(GL_ARRAY_BUFFER, normals.size() * sizeof(float), &normals[0], GL_STATIC_DRAW);
     glEnableVertexAttribArray(1);
@@ -675,11 +712,11 @@ void generate_map_chunk(unsigned int &VAO, std::vector<int> &indices, int xOffse
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 
 //    // Bind vertices to VBO
-//    glBindBuffer(GL_ARRAY_BUFFER, cVBO);
-//    glBufferData(GL_ARRAY_BUFFER, colors.size() * sizeof(float), &colors[0], GL_STATIC_DRAW);
-//    glEnableVertexAttribArray(2);
-//    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void *) 0);
-//    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindBuffer(GL_ARRAY_BUFFER, cVBO);
+    glBufferData(GL_ARRAY_BUFFER, colors.size() * sizeof(float), &colors[0], GL_STATIC_DRAW);
+    glEnableVertexAttribArray(2);
+    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void *) 0);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
 
     glBindVertexArray(0);
 }
