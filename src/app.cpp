@@ -14,7 +14,7 @@
 const unsigned int SCR_WIDTH = 800;
 const unsigned int SCR_HEIGHT = 600;
 const float SIZE = 10000;
-const float VERTEX_COUNT = 500;
+const float VERTEX_COUNT = 20;
 
 Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
 
@@ -106,17 +106,14 @@ int main() {
     unsigned int terrainVAO;
     generate_map_chunk(terrainVAO);
 
-
-    // CUBE
-    unsigned int cubeVAO, cubeVBO;
-    createCube(cubeVAO, cubeVBO);
     Shader terrainShader(
             "../../resources/shaders/terrain.vert",
             "../../resources/shaders/terrain.frag"
     );
     terrainShader.use();
     terrainShader.setBool("isFlat", true);
-    terrainShader.setVec3("light.ambient", 0.2, 0.2, 0.2);
+//    terrainShader.setVec3("position", lightPos);
+    terrainShader.setVec3("light.ambient", 0.3, 0.2, 0.2);
     terrainShader.setVec3("light.diffuse", 0.3, 0.3, 0.3);
     terrainShader.setVec3("light.specular", 1.0, 1.0, 1.0);
     terrainShader.setVec3("light.direction", -0.2f, -1.0f, -0.3f);
@@ -130,15 +127,6 @@ int main() {
     );
     skyboxShader.use();
     skyboxShader.setInt("skybox", 0);
-
-//    LIGHT
-//    Shader lightShader(
-//            "../../resources/shaders/basic.vert",
-//            "../../resources/shaders/basic.frag"
-//    );
-//    lightShader.use();
-//    lightShader.setInt("material.diffuse", 0);
-//    lightShader.setInt("material.specular", 1);
 
 //    RENDER LOOP
     while (!glfwWindowShouldClose(window)) {
@@ -160,9 +148,9 @@ int main() {
                                                 100.0f);
         glm::mat4 view = camera.GetViewMatrix();
         glm::mat4 model = glm::mat4(1.0f);
-        terrainShader.setMat4("u_projection", projection);
-        terrainShader.setMat4("u_view", view);
-        terrainShader.setVec3("u_viewPos", camera.Position);
+        terrainShader.setMat4("projection", projection);
+        terrainShader.setMat4("view", view);
+        terrainShader.setVec3("viewPos", camera.Position);
 
 //        TERRAIN
         model = glm::mat4(1.0f);
@@ -172,8 +160,10 @@ int main() {
                 -VERTEX_COUNT / 2.0 + (VERTEX_COUNT - 1) * 0
                                )
         );
-        terrainShader.setMat4("u_model", model);
+        terrainShader.setMat4("model", model);
 
+//        glActiveTexture(GL_TEXTURE0);
+//        glBindTexture(GL_TEXTURE_2D, grassTexture);
         glBindVertexArray(terrainVAO);
         glDrawElements(GL_TRIANGLES, VERTEX_COUNT * VERTEX_COUNT * 6, GL_UNSIGNED_INT, nullptr);
 
@@ -205,9 +195,7 @@ int main() {
     }
 
     glDeleteVertexArrays(1, &skyboxVAO);
-    glDeleteVertexArrays(1, &cubeVAO);
     glDeleteVertexArrays(1, &terrainVAO);
-    glDeleteBuffers(1, &cubeVBO);
     glDeleteBuffers(1, &skyboxVBO);
 
     glfwTerminate();
@@ -460,12 +448,13 @@ void lightningShaderSettings(Shader &lightingShader) {
 std::vector<int> generate_indices() {
     std::vector<int> indices;
 
+    int pos = 0;
     for (int y = 0; y < VERTEX_COUNT; y++)
         for (int x = 0; x < VERTEX_COUNT; x++) {
-            int pos = x + y * VERTEX_COUNT;
 
             if (x == VERTEX_COUNT - 1 || y == VERTEX_COUNT - 1) {
                 // Don't create indices for right or top edge
+                pos++;
                 continue;
             } else {
                 // Top left triangle of square
@@ -477,6 +466,7 @@ std::vector<int> generate_indices() {
                 indices.push_back(pos + 1 + VERTEX_COUNT);
                 indices.push_back(pos);
             }
+            pos++;
         }
 
     return indices;
@@ -632,11 +622,12 @@ std::vector<float> generate_texture_coords(std::vector<float> vertices) {
     int vertexPointer = 0;
     for (float i = 0; i < VERTEX_COUNT; i++) { // z
         for (float j = 0; j < VERTEX_COUNT; j++) { // x
-            //vertices[vertexPointer * 3] = j * 2;
-            vertices[vertexPointer * 3] = (float) j / ((float) VERTEX_COUNT - 1) * SIZE;
-            vertices[vertexPointer * 3 + 1] = 0;
-            vertices[vertexPointer * 3 + 2] = (float) i / ((float) VERTEX_COUNT - 1) * SIZE;
-            //vertices[vertexPointer * 3 + 2] = i * 2;
+//            vertices[vertexPointer * 3] = (float) j / ((float) VERTEX_COUNT - 1) * SIZE;
+//            vertices[vertexPointer * 3 + 1] = 0;
+//            vertices[vertexPointer * 3 + 2] = (float) i / ((float) VERTEX_COUNT - 1) * SIZE;
+//            std::cout << (float) j / ((float) VERTEX_COUNT - 1) << std::endl;
+//            std::cout << (float) i / ((float) VERTEX_COUNT - 1) << std::endl;
+//            std::cout << "---------------" << std::endl;
 
             textureCoords[vertexPointer * 2] = (float) j / ((float) VERTEX_COUNT - 1);
             textureCoords[vertexPointer * 2 + 1] = (float) i / ((float) VERTEX_COUNT - 1);
@@ -707,4 +698,7 @@ void generate_map_chunk(unsigned int &VAO) {
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 
     glBindVertexArray(0);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT);
 }

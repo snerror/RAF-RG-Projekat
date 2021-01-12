@@ -15,11 +15,11 @@ struct Light {
 };
 
 uniform Light light;
-uniform vec3 u_viewPos;
+uniform vec3 viewPos;
 
-uniform mat4 u_model;
-uniform mat4 u_view;
-uniform mat4 u_projection;
+uniform mat4 model;
+uniform mat4 view;
+uniform mat4 projection;
 
 vec3 calculateLighting(vec3 Normal, vec3 FragPos) {
     // Ambient lighting
@@ -33,7 +33,7 @@ vec3 calculateLighting(vec3 Normal, vec3 FragPos) {
 
     // Specular lighting
     float specularStrength = 0.5;
-    vec3 viewDir = normalize(u_viewPos - FragPos);
+    vec3 viewDir = normalize(viewPos - FragPos);
     vec3 reflectDir = reflect(-lightDir, Normal);
 
     float spec = pow(max(dot(viewDir, reflectDir), 0.0), 16);
@@ -43,7 +43,7 @@ vec3 calculateLighting(vec3 Normal, vec3 FragPos) {
 }
 
 void main() {
-    vec3 FragPos = vec3(u_model * vec4(aPos + aOffset, 1.0));
+    vec3 FragPos = vec3(model * vec4(aPos + aOffset, 1.0));
     vec3 Normal = aNormal;
     //    vec3 Normal = transpose(inverse(mat3(u_model))) * aNormal;
 
@@ -51,5 +51,5 @@ void main() {
     Color = aColor * lighting;
     flatColor = Color;
 
-    gl_Position = u_projection * u_view * u_model * vec4(aPos + aOffset, 1.0);
+    gl_Position = projection * view * model * vec4(aPos + aOffset, 1.0);
 }
