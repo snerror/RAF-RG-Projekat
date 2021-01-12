@@ -19,6 +19,7 @@ add_subdirectory(lib/glfw)
 include_directories(
         ${PROJECT_SOURCE_DIR}/include
         ${CMAKE_BINARY_DIR}/include
+        ${PROJECT_SOURCE_DIR}/lib/assimp/lib
 )
 
 set(
@@ -28,7 +29,10 @@ set(
         src/shader.h
         src/stb_image.h
         src/stb_image.cpp
-        src/camera.h)
+        src/camera.h
+        src/mesh.h
+        src/model.h
+)
 
 add_executable(${PROJECT_NAME} ${PROJECT_SOURCES})
 

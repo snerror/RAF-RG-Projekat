@@ -24,9 +24,6 @@ float lastFrame = 0.0f; // Time of last frame
 
 GLFWwindow *window = nullptr;
 
-// lighting
-glm::vec3 lightPos(1.2f, 1.0f, 2.0f);
-
 void init_glfw();
 
 void framebuffer_size_callback(GLFWwindow *, int, int);
