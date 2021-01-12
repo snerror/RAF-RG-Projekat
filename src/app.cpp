@@ -24,15 +24,15 @@ float lastFrame = 0.0f; // Time of last frame
 
 GLFWwindow *window = nullptr;
 
-void init_glfw();
+void initGlfw();
 
-void framebuffer_size_callback(GLFWwindow *, int, int);
+void framebufferSizeCallback(GLFWwindow *, int width, int height);
 
-void process_input(GLFWwindow *window);
+void processInput(GLFWwindow *window);
 
-void mouse_callback(GLFWwindow *window, double xpos, double ypos);
+void mouseCallback(GLFWwindow *window, double xpos, double ypos);
 
-void scroll_callback(GLFWwindow *window, double xoffset, double yoffset);
+void scrollCallback(GLFWwindow *window, double xoffset, double yoffset);
 
 unsigned int loadTexture(const char *path);
 
@@ -43,7 +43,7 @@ void createSkybox(unsigned int &texture, unsigned int &VAO, unsigned int &VBO);
 void lightningShaderSettings(Shader &lightingShader, glm::vec3 pointLightPositions[]);
 
 int main() {
-    init_glfw();
+    initGlfw();
     window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "RAF RG Projekat", nullptr, nullptr);
     if (window == nullptr) {
         std::cout << "Failed to create GLFW window" << std::endl;
@@ -51,11 +51,11 @@ int main() {
         return -1;
     }
     glfwMakeContextCurrent(window);
-    glfwSetCursorPosCallback(window, mouse_callback);
-    glfwSetScrollCallback(window, scroll_callback);
+    glfwSetCursorPosCallback(window, mouseCallback);
+    glfwSetScrollCallback(window, scrollCallback);
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
-    glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+    glfwSetFramebufferSizeCallback(window, framebufferSizeCallback);
     if (!gladLoadGLLoader((GLADloadproc) glfwGetProcAddress)) {
         std::cout << "Failed to initialize GLAD" << std::endl;
         return -1;
@@ -65,13 +65,13 @@ int main() {
 //    SETUP END
 
     Shader lightingShader(
-            "../../resources/shaders/light.vs.vert",
-            "../../resources/shaders/light.fs.vert"
+            "../../resources/shaders/light.vert",
+            "../../resources/shaders/light.frag"
     );
 
     Shader lightCubeShader(
-            "../../resources/vertex.vert",
-            "../../resources/fragment.vert"
+            "../../resources/shaders/vertex.vert",
+            "../../resources/shaders/fragment.frag"
     );
 
     float cubeVertices[] = {
@@ -162,8 +162,8 @@ int main() {
 
     // SKYBOX
     Shader skyboxShader(
-            "../../resources/shaders/skybox.vs.vert",
-            "../../resources/shaders/skybox.fs.vert"
+            "../../resources/shaders/skybox.vert",
+            "../../resources/shaders/skybox.frag"
     );
     skyboxShader.use();
     skyboxShader.setInt("skybox", 0);
@@ -175,7 +175,7 @@ int main() {
         lastFrame = currentFrame;
 
         // INPUT
-        process_input(window);
+        processInput(window);
 
         // RENDER
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
@@ -251,11 +251,11 @@ int main() {
     return 0;
 }
 
-void framebuffer_size_callback(GLFWwindow *window, int width, int height) {
+void framebufferSizeCallback(GLFWwindow *, int width, int height) {
     glViewport(0, 0, width, height);
 }
 
-void init_glfw() {
+void initGlfw() {
     glfwInit();
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
@@ -265,7 +265,7 @@ void init_glfw() {
 #endif
 }
 
-void process_input(GLFWwindow *window) {
+void processInput(GLFWwindow *window) {
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
         camera.ProcessKeyboard(FORWARD, deltaTime);
     if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
@@ -278,7 +278,7 @@ void process_input(GLFWwindow *window) {
         glfwSetWindowShouldClose(window, true);
 }
 
-void mouse_callback(GLFWwindow *window, double xpos, double ypos) {
+void mouseCallback(GLFWwindow *window, double xpos, double ypos) {
     if (firstMouse) {
         lastX = xpos;
         lastY = ypos;
@@ -293,7 +293,7 @@ void mouse_callback(GLFWwindow *window, double xpos, double ypos) {
     camera.ProcessMouseMovement(xoffset, yoffset);
 }
 
-void scroll_callback(GLFWwindow *window, double xoffset, double yoffset) {
+void scrollCallback(GLFWwindow *window, double xoffset, double yoffset) {
     camera.ProcessMouseScroll(yoffset);
 }
 
