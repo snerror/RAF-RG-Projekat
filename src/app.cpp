@@ -251,16 +251,6 @@ int main() {
         glBindTexture(GL_TEXTURE_2D, depthMap);
 //        renderQuad();
 
-////        LIGHT
-//        lightShader.use();
-//        lightShader.setVec3("viewPos", camera.Position);
-//        lightShader.setFloat("material.shininess", 32.0f);
-//        lightShaderSettings(lightShader);
-//        lightShader.setMat4("projection", projection);
-//        lightShader.setMat4("view", view);
-//        glm::mat4(1.0f);
-//        lightShader.setMat4("model", model);
-
 //        TERRAIN
         terrainShader.use();
         terrainShader.setMat4("projection", projection);
@@ -275,9 +265,6 @@ int main() {
                                )
         );
         terrainShader.setMat4("model", model);
-
-//        glActiveTexture(GL_TEXTURE0);
-//        glBindTexture(GL_TEXTURE_2D, grassTexture);
         glBindVertexArray(terrainVAO);
         glDrawElements(GL_TRIANGLES, VERTEX_COUNT * VERTEX_COUNT * 6, GL_UNSIGNED_INT, nullptr);
 
