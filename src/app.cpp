@@ -57,8 +57,6 @@ void createCube(unsigned int &VAO, unsigned int &VBO);
 
 void createSkybox(unsigned int &texture, unsigned int &VAO, unsigned int &VBO);
 
-void lightningShaderSettings(Shader &lightingShader);
-
 std::vector<int> generate_indices();
 
 std::vector<float> generate_noise_map(int xOffset, int yOffset);
@@ -72,6 +70,8 @@ std::vector<float> generate_biome(const std::vector<float> &vertices);
 std::vector<float> generate_texture_coords(std::vector<float> vertices);
 
 void generate_map_chunk(unsigned int &VAO);
+
+void lightShaderSettings(Shader &shader);
 
 int main() {
     initGlfw();
@@ -102,7 +102,32 @@ int main() {
     unsigned int rockTexture = loadTexture("../../resources/textures/mountains.jpg");
     unsigned int heightMap = loadTexture("../../resources/heightmap.bmp");
 
-    // TERRAIN
+//    CUBE
+    unsigned int cubeVAO, cubeVBO;
+    createCube(cubeVAO, cubeVBO);
+    glm::vec3 cubePositions[] = {
+            glm::vec3(0.0f, 0.0f, 0.0f),
+            glm::vec3(2.0f, 5.0f, -15.0f),
+            glm::vec3(-1.5f, -2.2f, -2.5f),
+            glm::vec3(-3.8f, -2.0f, -12.3f),
+            glm::vec3(2.4f, -0.4f, -3.5f),
+            glm::vec3(-1.7f, 3.0f, -7.5f),
+            glm::vec3(1.3f, -2.0f, -2.5f),
+            glm::vec3(1.5f, 2.0f, -2.5f),
+            glm::vec3(1.5f, 0.2f, -1.5f),
+            glm::vec3(-1.3f, 1.0f, -1.5f)
+    };
+
+//    LIGHT
+    Shader lightShader(
+            "../../resources/shaders/light.vert",
+            "../../resources/shaders/light.frag"
+    );
+    lightShader.use();
+    lightShader.setInt("material.diffuse", 0);
+    lightShader.setInt("material.specular", 1);
+
+//    TERRAIN
     unsigned int terrainVAO;
     generate_map_chunk(terrainVAO);
 
@@ -112,7 +137,6 @@ int main() {
     );
     terrainShader.use();
     terrainShader.setBool("isFlat", true);
-//    terrainShader.setVec3("position", lightPos);
     terrainShader.setVec3("light.ambient", 0.3, 0.2, 0.2);
     terrainShader.setVec3("light.diffuse", 0.3, 0.3, 0.3);
     terrainShader.setVec3("light.specular", 1.0, 1.0, 1.0);
@@ -141,39 +165,60 @@ int main() {
         // RENDER
         glClearColor(0.4f, 0.4f, 0.4f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-        terrainShader.use();
-
-        glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float) SCR_WIDTH / (float) SCR_HEIGHT, 0.1f,
-                                                100.0f);
-        glm::mat4 view = camera.GetViewMatrix();
         glm::mat4 model = glm::mat4(1.0f);
+        glm::mat4 view = glm::mat4(1.0f);
+        glm::mat4 projection = glm::mat4(1.0f);
+
+        projection = glm::perspective(glm::radians(camera.Zoom), (float) SCR_WIDTH / (float) SCR_HEIGHT, 0.1f,
+                                      100.0f);
+        view = camera.GetViewMatrix();
+        model = glm::mat4(1.0f);
+
+//        LIGHT
+        lightShader.use();
+        lightShader.setVec3("viewPos", camera.Position);
+        lightShader.setFloat("material.shininess", 32.0f);
+        lightShaderSettings(lightShader);
+        lightShader.setMat4("projection", projection);
+        lightShader.setMat4("view", view);
+        lightShader.setMat4("model", model);
+
+//        CUBE
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, diffuseMap);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, specularMap);
+        glBindVertexArray(cubeVAO);
+        for (unsigned int i = 0; i < 10; i++) {
+            model = glm::mat4(1.0f);
+            model = glm::translate(model, cubePositions[i]);
+            float angle = 20.0f * i;
+            model = glm::rotate(model, glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f));
+            lightShader.setMat4("model", model);
+            glDrawArrays(GL_TRIANGLES, 0, 36);
+        }
+//        glBindVertexArray(cubeVAO);
+//        glDrawArrays(GL_TRIANGLES, 0, 36);
+
+//        TERRAIN
+        terrainShader.use();
         terrainShader.setMat4("projection", projection);
         terrainShader.setMat4("view", view);
         terrainShader.setVec3("viewPos", camera.Position);
 
-//        TERRAIN
         model = glm::mat4(1.0f);
-        model = glm::translate(model, glm::vec3(
-                -VERTEX_COUNT / 2.0 + (VERTEX_COUNT - 1) * 0,
-                -15.0,
-                -VERTEX_COUNT / 2.0 + (VERTEX_COUNT - 1) * 0
-                               )
-        );
+//        model = glm::translate(model, glm::vec3(
+//                -VERTEX_COUNT / 2.0 + (VERTEX_COUNT - 1) * 0,
+//                -15.0,
+//                -VERTEX_COUNT / 2.0 + (VERTEX_COUNT - 1) * 0
+//                               )
+//        );
         terrainShader.setMat4("model", model);
 
 //        glActiveTexture(GL_TEXTURE0);
 //        glBindTexture(GL_TEXTURE_2D, grassTexture);
         glBindVertexArray(terrainVAO);
         glDrawElements(GL_TRIANGLES, VERTEX_COUNT * VERTEX_COUNT * 6, GL_UNSIGNED_INT, nullptr);
-
-        // CUBE
-//        glActiveTexture(GL_TEXTURE0);
-//        glBindTexture(GL_TEXTURE_2D, diffuseMap);
-//        glActiveTexture(GL_TEXTURE1);
-//        glBindTexture(GL_TEXTURE_2D, specularMap);
-//        glBindVertexArray(cubeVAO);
-//        glDrawArrays(GL_TRIANGLES, 0, 36);
 
         // SKYBOX
         glDepthFunc(GL_LEQUAL);
@@ -196,9 +241,12 @@ int main() {
 
     glDeleteVertexArrays(1, &skyboxVAO);
     glDeleteVertexArrays(1, &terrainVAO);
+    glDeleteVertexArrays(1, &cubeVAO);
     glDeleteBuffers(1, &skyboxVBO);
+    glDeleteBuffers(1, &cubeVBO);
 
     glfwTerminate();
+
     return 0;
 }
 
@@ -436,15 +484,6 @@ void createSkybox(unsigned int &texture, unsigned int &VAO, unsigned int &VBO) {
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void *) 0);
 }
 
-void lightningShaderSettings(Shader &lightingShader) {
-    lightingShader.setVec3("light.position", lightPos);
-    lightingShader.setVec3("viewPos", camera.Position);
-    lightingShader.setVec3("light.ambient", 0.2f, 0.2f, 0.2f);
-    lightingShader.setVec3("light.diffuse", 0.5f, 0.5f, 0.5f);
-    lightingShader.setVec3("light.specular", 1.0f, 1.0f, 1.0f);
-    lightingShader.setFloat("material.shininess", 64.0f);
-}
-
 std::vector<int> generate_indices() {
     std::vector<int> indices;
 
@@ -622,13 +661,6 @@ std::vector<float> generate_texture_coords(std::vector<float> vertices) {
     int vertexPointer = 0;
     for (float i = 0; i < VERTEX_COUNT; i++) { // z
         for (float j = 0; j < VERTEX_COUNT; j++) { // x
-//            vertices[vertexPointer * 3] = (float) j / ((float) VERTEX_COUNT - 1) * SIZE;
-//            vertices[vertexPointer * 3 + 1] = 0;
-//            vertices[vertexPointer * 3 + 2] = (float) i / ((float) VERTEX_COUNT - 1) * SIZE;
-//            std::cout << (float) j / ((float) VERTEX_COUNT - 1) << std::endl;
-//            std::cout << (float) i / ((float) VERTEX_COUNT - 1) << std::endl;
-//            std::cout << "---------------" << std::endl;
-
             textureCoords[vertexPointer * 2] = (float) j / ((float) VERTEX_COUNT - 1);
             textureCoords[vertexPointer * 2 + 1] = (float) i / ((float) VERTEX_COUNT - 1);
             vertexPointer++;
@@ -701,4 +733,62 @@ void generate_map_chunk(unsigned int &VAO) {
 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT);
+}
+
+void lightShaderSettings(Shader &shader) {
+    glm::vec3 pointLightPositions[] = {
+            glm::vec3(0.7f, 0.2f, 2.0f),
+            glm::vec3(2.3f, -3.3f, -4.0f),
+            glm::vec3(-4.0f, 2.0f, -12.0f),
+            glm::vec3(0.0f, 0.0f, -3.0f)
+    };
+
+    // directional light
+    shader.setVec3("dirLight.direction", -0.2f, -1.0f, -0.3f);
+    shader.setVec3("dirLight.ambient", 0.05f, 0.05f, 0.05f);
+    shader.setVec3("dirLight.diffuse", 0.4f, 0.4f, 0.4f);
+    shader.setVec3("dirLight.specular", 0.5f, 0.5f, 0.5f);
+    // point light 1
+    shader.setVec3("pointLights[0].position", pointLightPositions[0]);
+    shader.setVec3("pointLights[0].ambient", 0.05f, 0.05f, 0.05f);
+    shader.setVec3("pointLights[0].diffuse", 0.8f, 0.8f, 0.8f);
+    shader.setVec3("pointLights[0].specular", 1.0f, 1.0f, 1.0f);
+    shader.setFloat("pointLights[0].constant", 1.0f);
+    shader.setFloat("pointLights[0].linear", 0.09);
+    shader.setFloat("pointLights[0].quadratic", 0.032);
+    // point light 2
+    shader.setVec3("pointLights[1].position", pointLightPositions[1]);
+    shader.setVec3("pointLights[1].ambient", 0.05f, 0.05f, 0.05f);
+    shader.setVec3("pointLights[1].diffuse", 0.8f, 0.8f, 0.8f);
+    shader.setVec3("pointLights[1].specular", 1.0f, 1.0f, 1.0f);
+    shader.setFloat("pointLights[1].constant", 1.0f);
+    shader.setFloat("pointLights[1].linear", 0.09);
+    shader.setFloat("pointLights[1].quadratic", 0.032);
+    // point light 3
+    shader.setVec3("pointLights[2].position", pointLightPositions[2]);
+    shader.setVec3("pointLights[2].ambient", 0.05f, 0.05f, 0.05f);
+    shader.setVec3("pointLights[2].diffuse", 0.8f, 0.8f, 0.8f);
+    shader.setVec3("pointLights[2].specular", 1.0f, 1.0f, 1.0f);
+    shader.setFloat("pointLights[2].constant", 1.0f);
+    shader.setFloat("pointLights[2].linear", 0.09);
+    shader.setFloat("pointLights[2].quadratic", 0.032);
+    // point light 4
+    shader.setVec3("pointLights[3].position", pointLightPositions[3]);
+    shader.setVec3("pointLights[3].ambient", 0.05f, 0.05f, 0.05f);
+    shader.setVec3("pointLights[3].diffuse", 0.8f, 0.8f, 0.8f);
+    shader.setVec3("pointLights[3].specular", 1.0f, 1.0f, 1.0f);
+    shader.setFloat("pointLights[3].constant", 1.0f);
+    shader.setFloat("pointLights[3].linear", 0.09);
+    shader.setFloat("pointLights[3].quadratic", 0.032);
+    // spotLight
+    shader.setVec3("spotLight.position", camera.Position);
+    shader.setVec3("spotLight.direction", camera.Front);
+    shader.setVec3("spotLight.ambient", 0.0f, 0.0f, 0.0f);
+    shader.setVec3("spotLight.diffuse", 1.0f, 1.0f, 1.0f);
+    shader.setVec3("spotLight.specular", 1.0f, 1.0f, 1.0f);
+    shader.setFloat("spotLight.constant", 1.0f);
+    shader.setFloat("spotLight.linear", 0.09);
+    shader.setFloat("spotLight.quadratic", 0.032);
+    shader.setFloat("spotLight.cutOff", glm::cos(glm::radians(12.5f)));
+    shader.setFloat("spotLight.outerCutOff", glm::cos(glm::radians(15.0f)));
 }
