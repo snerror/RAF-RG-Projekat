@@ -57,6 +57,8 @@ void createCube(unsigned int &VAO, unsigned int &VBO);
 
 void createSkybox(unsigned int &texture, unsigned int &VAO, unsigned int &VBO);
 
+void createFloor(unsigned int &VAO);
+
 std::vector<int> generate_indices();
 
 std::vector<float> generate_noise_map(int xOffset, int yOffset);
@@ -102,6 +104,14 @@ int main() {
     unsigned int rockTexture = loadTexture("../../resources/textures/mountains.jpg");
     unsigned int heightMap = loadTexture("../../resources/heightmap.bmp");
 
+//    FLOOR
+    Shader floorShader(
+            "../../resources/shaders/floor.vert",
+            "../../resources/shaders/floor.frag"
+    );
+    unsigned int floorVAO;
+    createFloor(floorVAO);
+
 //    CUBE
     unsigned int cubeVAO, cubeVBO;
     createCube(cubeVAO, cubeVBO);
@@ -127,30 +137,30 @@ int main() {
     lightShader.setInt("material.diffuse", 0);
     lightShader.setInt("material.specular", 1);
 
-//    TERRAIN
-    unsigned int terrainVAO;
-    generate_map_chunk(terrainVAO);
+////    TERRAIN
+//    unsigned int terrainVAO;
+//    generate_map_chunk(terrainVAO);
+//
+//    Shader terrainShader(
+//            "../../resources/shaders/terrain.vert",
+//            "../../resources/shaders/terrain.frag"
+//    );
+//    terrainShader.use();
+//    terrainShader.setBool("isFlat", true);
+//    terrainShader.setVec3("light.ambient", 0.3, 0.2, 0.2);
+//    terrainShader.setVec3("light.diffuse", 0.3, 0.3, 0.3);
+//    terrainShader.setVec3("light.specular", 1.0, 1.0, 1.0);
+//    terrainShader.setVec3("light.direction", -0.2f, -1.0f, -0.3f);
 
-    Shader terrainShader(
-            "../../resources/shaders/terrain.vert",
-            "../../resources/shaders/terrain.frag"
-    );
-    terrainShader.use();
-    terrainShader.setBool("isFlat", true);
-    terrainShader.setVec3("light.ambient", 0.3, 0.2, 0.2);
-    terrainShader.setVec3("light.diffuse", 0.3, 0.3, 0.3);
-    terrainShader.setVec3("light.specular", 1.0, 1.0, 1.0);
-    terrainShader.setVec3("light.direction", -0.2f, -1.0f, -0.3f);
-
-    // SKYBOX
-    unsigned int skyboxTexture, skyboxVAO, skyboxVBO;
-    createSkybox(skyboxTexture, skyboxVAO, skyboxVBO);
-    Shader skyboxShader(
-            "../../resources/shaders/skybox.vert",
-            "../../resources/shaders/skybox.frag"
-    );
-    skyboxShader.use();
-    skyboxShader.setInt("skybox", 0);
+//    // SKYBOX
+//    unsigned int skyboxTexture, skyboxVAO, skyboxVBO;
+//    createSkybox(skyboxTexture, skyboxVAO, skyboxVBO);
+//    Shader skyboxShader(
+//            "../../resources/shaders/skybox.vert",
+//            "../../resources/shaders/skybox.frag"
+//    );
+//    skyboxShader.use();
+//    skyboxShader.setInt("skybox", 0);
 
 //    RENDER LOOP
     while (!glfwWindowShouldClose(window)) {
@@ -165,14 +175,22 @@ int main() {
         // RENDER
         glClearColor(0.4f, 0.4f, 0.4f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        glm::mat4 model = glm::mat4(1.0f);
-        glm::mat4 view = glm::mat4(1.0f);
-        glm::mat4 projection = glm::mat4(1.0f);
 
-        projection = glm::perspective(glm::radians(camera.Zoom), (float) SCR_WIDTH / (float) SCR_HEIGHT, 0.1f,
-                                      100.0f);
-        view = camera.GetViewMatrix();
-        model = glm::mat4(1.0f);
+        glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float) SCR_WIDTH / (float) SCR_HEIGHT, 0.1f,
+                                                100.0f);
+        glm::mat4 view = camera.GetViewMatrix();
+        glm::mat4 model = glm::mat4(1.0f);
+
+//        FLOOR
+        floorShader.use();
+        floorShader.setVec3("light.position", camera.Position);
+        floorShader.setVec3("light.ambient", 0.5f, 0.5f, 0.5f);
+        floorShader.setMat4("view", view);
+        floorShader.setMat4("projection", projection);
+        model = glm::rotate(model, glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+        floorShader.setMat4("model", model);
+        glBindVertexArray(floorVAO);
+        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
 //        LIGHT
         lightShader.use();
@@ -181,6 +199,7 @@ int main() {
         lightShaderSettings(lightShader);
         lightShader.setMat4("projection", projection);
         lightShader.setMat4("view", view);
+        glm::mat4(1.0f);
         lightShader.setMat4("model", model);
 
 //        CUBE
@@ -197,41 +216,39 @@ int main() {
             lightShader.setMat4("model", model);
             glDrawArrays(GL_TRIANGLES, 0, 36);
         }
-//        glBindVertexArray(cubeVAO);
-//        glDrawArrays(GL_TRIANGLES, 0, 36);
 
-//        TERRAIN
-        terrainShader.use();
-        terrainShader.setMat4("projection", projection);
-        terrainShader.setMat4("view", view);
-        terrainShader.setVec3("viewPos", camera.Position);
+////        TERRAIN
+//        terrainShader.use();
+//        terrainShader.setMat4("projection", projection);
+//        terrainShader.setMat4("view", view);
+//        terrainShader.setVec3("viewPos", camera.Position);
+//
+//        model = glm::mat4(1.0f);
+////        model = glm::translate(model, glm::vec3(
+////                -VERTEX_COUNT / 2.0 + (VERTEX_COUNT - 1) * 0,
+////                -15.0,
+////                -VERTEX_COUNT / 2.0 + (VERTEX_COUNT - 1) * 0
+////                               )
+////        );
+////        terrainShader.setMat4("model", model);
+//
+////        glActiveTexture(GL_TEXTURE0);
+////        glBindTexture(GL_TEXTURE_2D, grassTexture);
+//        glBindVertexArray(terrainVAO);
+//        glDrawElements(GL_TRIANGLES, VERTEX_COUNT * VERTEX_COUNT * 6, GL_UNSIGNED_INT, nullptr);
 
-        model = glm::mat4(1.0f);
-//        model = glm::translate(model, glm::vec3(
-//                -VERTEX_COUNT / 2.0 + (VERTEX_COUNT - 1) * 0,
-//                -15.0,
-//                -VERTEX_COUNT / 2.0 + (VERTEX_COUNT - 1) * 0
-//                               )
-//        );
-        terrainShader.setMat4("model", model);
-
+//        // SKYBOX
+//        glDepthFunc(GL_LEQUAL);
+//        skyboxShader.use();
+//        view = glm::mat4(glm::mat3(camera.GetViewMatrix()));
+//        skyboxShader.setMat4("view", view);
+//        skyboxShader.setMat4("projection", projection);
+//        glBindVertexArray(skyboxVAO);
 //        glActiveTexture(GL_TEXTURE0);
-//        glBindTexture(GL_TEXTURE_2D, grassTexture);
-        glBindVertexArray(terrainVAO);
-        glDrawElements(GL_TRIANGLES, VERTEX_COUNT * VERTEX_COUNT * 6, GL_UNSIGNED_INT, nullptr);
-
-        // SKYBOX
-        glDepthFunc(GL_LEQUAL);
-        skyboxShader.use();
-        view = glm::mat4(glm::mat3(camera.GetViewMatrix()));
-        skyboxShader.setMat4("view", view);
-        skyboxShader.setMat4("projection", projection);
-        glBindVertexArray(skyboxVAO);
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, skyboxTexture);
-        glDrawArrays(GL_TRIANGLES, 0, 36);
-        glBindVertexArray(0);
-        glDepthFunc(GL_LESS);
+//        glBindTexture(GL_TEXTURE_CUBE_MAP, skyboxTexture);
+//        glDrawArrays(GL_TRIANGLES, 0, 36);
+//        glBindVertexArray(0);
+//        glDepthFunc(GL_LESS);
 
         // END
         glfwSwapBuffers(window);
@@ -239,10 +256,11 @@ int main() {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     }
 
-    glDeleteVertexArrays(1, &skyboxVAO);
-    glDeleteVertexArrays(1, &terrainVAO);
+//    glDeleteVertexArrays(1, &skyboxVAO);
+//    glDeleteVertexArrays(1, &terrainVAO);
     glDeleteVertexArrays(1, &cubeVAO);
-    glDeleteBuffers(1, &skyboxVBO);
+//    glDeleteVertexArrays(1, &floorVAO);
+//    glDeleteBuffers(1, &skyboxVBO);
     glDeleteBuffers(1, &cubeVBO);
 
     glfwTerminate();
@@ -664,6 +682,10 @@ std::vector<float> generate_texture_coords(std::vector<float> vertices) {
             textureCoords[vertexPointer * 2] = (float) j / ((float) VERTEX_COUNT - 1);
             textureCoords[vertexPointer * 2 + 1] = (float) i / ((float) VERTEX_COUNT - 1);
             vertexPointer++;
+//           1.0f, 1.0f, // top right
+//           1.0f, 0.0f, // bottom right
+//           0.0f, 0.0f, // bottom left
+//           0.0f, 1.0f  // top left
         }
     }
     return textureCoords;
@@ -791,4 +813,31 @@ void lightShaderSettings(Shader &shader) {
     shader.setFloat("spotLight.quadratic", 0.032);
     shader.setFloat("spotLight.cutOff", glm::cos(glm::radians(12.5f)));
     shader.setFloat("spotLight.outerCutOff", glm::cos(glm::radians(15.0f)));
+}
+
+void createFloor(unsigned int &floorVAO) {
+    float floorSize = 10.0f;
+    float floorOffset = -2.5f;
+    float vertices[] = {
+            // positions
+            floorSize, floorSize, floorOffset,
+            floorSize, -floorSize, floorOffset,
+            -floorSize, -floorSize, floorOffset,
+            -floorSize, floorSize, floorOffset,
+    };
+    unsigned int indices[] = {
+            0, 1, 3, // first triangle
+            1, 2, 3  // second triangle
+    };
+    unsigned int floorVBO, floorEBO;
+    glGenVertexArrays(1, &floorVAO);
+    glGenBuffers(1, &floorVBO);
+    glGenBuffers(1, &floorEBO);
+    glBindVertexArray(floorVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, floorVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, floorEBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void *) 0);
+    glEnableVertexAttribArray(0);
 }
