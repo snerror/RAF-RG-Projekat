@@ -261,25 +261,25 @@ int main() {
 //        glm::mat4(1.0f);
 //        lightShader.setMat4("model", model);
 
-////        TERRAIN
-//        terrainShader.use();
-//        terrainShader.setMat4("projection", projection);
-//        terrainShader.setMat4("view", view);
-//        terrainShader.setVec3("viewPos", camera.Position);
-//
-//        model = glm::mat4(1.0f);
-////        model = glm::translate(model, glm::vec3(
-////                -VERTEX_COUNT / 2.0 + (VERTEX_COUNT - 1) * 0,
-////                -15.0,
-////                -VERTEX_COUNT / 2.0 + (VERTEX_COUNT - 1) * 0
-////                               )
-////        );
-////        terrainShader.setMat4("model", model);
-//
-////        glActiveTexture(GL_TEXTURE0);
-////        glBindTexture(GL_TEXTURE_2D, grassTexture);
-//        glBindVertexArray(terrainVAO);
-//        glDrawElements(GL_TRIANGLES, VERTEX_COUNT * VERTEX_COUNT * 6, GL_UNSIGNED_INT, nullptr);
+//        TERRAIN
+        terrainShader.use();
+        terrainShader.setMat4("projection", projection);
+        terrainShader.setMat4("view", view);
+        terrainShader.setVec3("viewPos", camera.Position);
+
+        glm::mat4 model = glm::mat4(1.0f);
+        model = glm::translate(model, glm::vec3(
+                -VERTEX_COUNT / 2.0 + (VERTEX_COUNT - 1) * 0,
+                -15.0,
+                -VERTEX_COUNT / 2.0 + (VERTEX_COUNT - 1) * 0
+                               )
+        );
+        terrainShader.setMat4("model", model);
+
+//        glActiveTexture(GL_TEXTURE0);
+//        glBindTexture(GL_TEXTURE_2D, grassTexture);
+        glBindVertexArray(terrainVAO);
+        glDrawElements(GL_TRIANGLES, VERTEX_COUNT * VERTEX_COUNT * 6, GL_UNSIGNED_INT, nullptr);
 
         // SKYBOX
         glDepthFunc(GL_LEQUAL);
@@ -732,26 +732,26 @@ void createFloor(unsigned int &floorVAO) {
 
 void renderScene(const Shader &shader, unsigned int &floorVAO, unsigned int &terrainVAO) {
     glm::mat4 model = glm::mat4(1.0f);
-    // floor
-    shader.setMat4("model", model);
-    glBindVertexArray(floorVAO);
-    glDrawArrays(GL_TRIANGLES, 0, 6);
+//    // floor
+//    shader.setMat4("model", model);
+//    glBindVertexArray(floorVAO);
+//    glDrawArrays(GL_TRIANGLES, 0, 6);
 
-//        TERRAIN
-    shader.setVec3("viewPos", camera.Position);
-    model = glm::mat4(1.0f);
-    model = glm::translate(model, glm::vec3(
-            -VERTEX_COUNT / 2.0 + (VERTEX_COUNT - 1) * 0,
-            -7.0,
-            -VERTEX_COUNT / 2.0 + (VERTEX_COUNT - 1) * 0
-                           )
-    );
-    shader.setMat4("model", model);
-
-//        glActiveTexture(GL_TEXTURE0);
-//        glBindTexture(GL_TEXTURE_2D, grassTexture);
-    glBindVertexArray(terrainVAO);
-    glDrawElements(GL_TRIANGLES, VERTEX_COUNT * VERTEX_COUNT * 6, GL_UNSIGNED_INT, nullptr);
+////        TERRAIN
+//    shader.setVec3("viewPos", camera.Position);
+//    model = glm::mat4(1.0f);
+//    model = glm::translate(model, glm::vec3(
+//            -VERTEX_COUNT / 2.0 + (VERTEX_COUNT - 1) * 0,
+//            -7.0,
+//            -VERTEX_COUNT / 2.0 + (VERTEX_COUNT - 1) * 0
+//                           )
+//    );
+//    shader.setMat4("model", model);
+//
+////        glActiveTexture(GL_TEXTURE0);
+////        glBindTexture(GL_TEXTURE_2D, grassTexture);
+//    glBindVertexArray(terrainVAO);
+//    glDrawElements(GL_TRIANGLES, VERTEX_COUNT * VERTEX_COUNT * 6, GL_UNSIGNED_INT, nullptr);
 
     // cubes
     model = glm::mat4(1.0f);
