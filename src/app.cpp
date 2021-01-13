@@ -14,7 +14,7 @@
 const unsigned int SCR_WIDTH = 800;
 const unsigned int SCR_HEIGHT = 600;
 const float SIZE = 10000;
-const float VERTEX_COUNT = 20;
+const float VERTEX_COUNT = 200;
 const unsigned int SHADOW_WIDTH = 1024, SHADOW_HEIGHT = 1024;
 
 Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
@@ -117,10 +117,6 @@ int main() {
 //    Shader floorShader("../../resources/shaders/floor.vert", "../../resources/shaders/floor.frag");
     unsigned int floorVAO;
     createFloor(floorVAO);
-
-//    CUBE
-    unsigned int cubesVAO, cubesVBO;
-    createCube(cubesVAO, cubesVBO);
 
 //    LIGHT
     Shader lightShader("../../resources/shaders/light.vert", "../../resources/shaders/light.frag");
@@ -243,6 +239,7 @@ int main() {
         glBindTexture(GL_TEXTURE_2D, grassTexture);
         glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_2D, depthMap);
+//        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
         renderScene(shader, floorVAO, terrainVAO);
 
         // render Depth map to quad for visual debugging
@@ -420,49 +417,6 @@ unsigned int loadCubemap(std::vector<std::string> faces) {
     return textureID;
 }
 
-
-void createCube(unsigned int &VAO, unsigned int &VBO) {
-    float cubeVertices[] = {
-            // positions          // normals           // texture coords
-            -0.5f, -0.5f, -0.5f, 0.0f, 0.0f, -1.0f, 0.0f, 0.0f, 0.5f, -0.5f, -0.5f, 0.0f, 0.0f, -1.0f, 1.0f, 0.0f, 0.5f,
-            0.5f, -0.5f, 0.0f, 0.0f, -1.0f, 1.0f, 1.0f, 0.5f, 0.5f, -0.5f, 0.0f, 0.0f, -1.0f, 1.0f, 1.0f, -0.5f, 0.5f,
-            -0.5f, 0.0f, 0.0f, -1.0f, 0.0f, 1.0f, -0.5f, -0.5f, -0.5f, 0.0f, 0.0f, -1.0f, 0.0f, 0.0f,
-
-            -0.5f, -0.5f, 0.5f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.5f, -0.5f, 0.5f, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 0.5f,
-            0.5f, 0.5f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f, 0.5f, 0.5f, 0.5f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f, -0.5f, 0.5f, 0.5f,
-            0.0f, 0.0f, 1.0f, 0.0f, 1.0f, -0.5f, -0.5f, 0.5f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
-
-            -0.5f, 0.5f, 0.5f, -1.0f, 0.0f, 0.0f, 1.0f, 0.0f, -0.5f, 0.5f, -0.5f, -1.0f, 0.0f, 0.0f, 1.0f, 1.0f, -0.5f,
-            -0.5f, -0.5f, -1.0f, 0.0f, 0.0f, 0.0f, 1.0f, -0.5f, -0.5f, -0.5f, -1.0f, 0.0f, 0.0f, 0.0f, 1.0f, -0.5f,
-            -0.5f, 0.5f, -1.0f, 0.0f, 0.0f, 0.0f, 0.0f, -0.5f, 0.5f, 0.5f, -1.0f, 0.0f, 0.0f, 1.0f, 0.0f,
-
-            0.5f, 0.5f, 0.5f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.5f, 0.5f, -0.5f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f, 0.5f,
-            -0.5f, -0.5f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.5f, -0.5f, -0.5f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.5f, -0.5f,
-            0.5f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.5f, 0.5f, 0.5f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f,
-
-            -0.5f, -0.5f, -0.5f, 0.0f, -1.0f, 0.0f, 0.0f, 1.0f, 0.5f, -0.5f, -0.5f, 0.0f, -1.0f, 0.0f, 1.0f, 1.0f, 0.5f,
-            -0.5f, 0.5f, 0.0f, -1.0f, 0.0f, 1.0f, 0.0f, 0.5f, -0.5f, 0.5f, 0.0f, -1.0f, 0.0f, 1.0f, 0.0f, -0.5f, -0.5f,
-            0.5f, 0.0f, -1.0f, 0.0f, 0.0f, 0.0f, -0.5f, -0.5f, -0.5f, 0.0f, -1.0f, 0.0f, 0.0f, 1.0f,
-
-            -0.5f, 0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.5f, 0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 1.0f, 1.0f, 0.5f,
-            0.5f, 0.5f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.5f, 0.5f, 0.5f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f, -0.5f, 0.5f, 0.5f,
-            0.0f, 1.0f, 0.0f, 0.0f, 0.0f, -0.5f, 0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f};
-
-    glGenVertexArrays(1, &VAO);
-    glGenBuffers(1, &VBO);
-    glBindVertexArray(VAO);
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(cubeVertices), &cubeVertices, GL_STATIC_DRAW);
-    glBindVertexArray(VAO);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void *) 0);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void *) (3 * sizeof(float)));
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void *) (6 * sizeof(float)));
-    glEnableVertexAttribArray(2);
-}
-
-
 void createSkybox(unsigned int &texture, unsigned int &VAO, unsigned int &VBO) {
     std::vector<std::string> faces{"../../resources/skybox/right.jpg", "../../resources/skybox/left.jpg",
                                    "../../resources/skybox/top.jpg", "../../resources/skybox/bottom.jpg",
@@ -585,10 +539,7 @@ std::vector<float> generate_vertices(const std::vector<float> &noise_map) {
     for (int y = 0; y < VERTEX_COUNT + 1; y++)
         for (int x = 0; x < VERTEX_COUNT; x++) {
             v.push_back(x);
-            // Apply cubic easing to the noise
             float easedNoise = std::pow(noise_map[x + y * VERTEX_COUNT] * 1.1, 3);
-            // Scale noise to match meshHeight
-            // Pervent vertex height from being below WATER_HEIGHT
             v.push_back(std::fmax(easedNoise * meshHeight, WATER_HEIGHT * 0.5 * meshHeight));
             v.push_back(y);
         }
@@ -753,60 +704,6 @@ void generate_map_chunk(unsigned int &VAO) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT);
 }
 
-void lightShaderSettings(Shader &shader) {
-    glm::vec3 pointLightPositions[] = {glm::vec3(0.7f, 0.2f, 2.0f), glm::vec3(2.3f, -3.3f, -4.0f),
-                                       glm::vec3(-4.0f, 2.0f, -12.0f), glm::vec3(0.0f, 0.0f, -3.0f)};
-
-    // directional light
-    shader.setVec3("dirLight.direction", -0.2f, -1.0f, -0.3f);
-    shader.setVec3("dirLight.ambient", 0.05f, 0.05f, 0.05f);
-    shader.setVec3("dirLight.diffuse", 0.4f, 0.4f, 0.4f);
-    shader.setVec3("dirLight.specular", 0.5f, 0.5f, 0.5f);
-    // point light 1
-    shader.setVec3("pointLights[0].position", pointLightPositions[0]);
-    shader.setVec3("pointLights[0].ambient", 0.05f, 0.05f, 0.05f);
-    shader.setVec3("pointLights[0].diffuse", 0.8f, 0.8f, 0.8f);
-    shader.setVec3("pointLights[0].specular", 1.0f, 1.0f, 1.0f);
-    shader.setFloat("pointLights[0].constant", 1.0f);
-    shader.setFloat("pointLights[0].linear", 0.09);
-    shader.setFloat("pointLights[0].quadratic", 0.032);
-    // point light 2
-    shader.setVec3("pointLights[1].position", pointLightPositions[1]);
-    shader.setVec3("pointLights[1].ambient", 0.05f, 0.05f, 0.05f);
-    shader.setVec3("pointLights[1].diffuse", 0.8f, 0.8f, 0.8f);
-    shader.setVec3("pointLights[1].specular", 1.0f, 1.0f, 1.0f);
-    shader.setFloat("pointLights[1].constant", 1.0f);
-    shader.setFloat("pointLights[1].linear", 0.09);
-    shader.setFloat("pointLights[1].quadratic", 0.032);
-    // point light 3
-    shader.setVec3("pointLights[2].position", pointLightPositions[2]);
-    shader.setVec3("pointLights[2].ambient", 0.05f, 0.05f, 0.05f);
-    shader.setVec3("pointLights[2].diffuse", 0.8f, 0.8f, 0.8f);
-    shader.setVec3("pointLights[2].specular", 1.0f, 1.0f, 1.0f);
-    shader.setFloat("pointLights[2].constant", 1.0f);
-    shader.setFloat("pointLights[2].linear", 0.09);
-    shader.setFloat("pointLights[2].quadratic", 0.032);
-    // point light 4
-    shader.setVec3("pointLights[3].position", pointLightPositions[3]);
-    shader.setVec3("pointLights[3].ambient", 0.05f, 0.05f, 0.05f);
-    shader.setVec3("pointLights[3].diffuse", 0.8f, 0.8f, 0.8f);
-    shader.setVec3("pointLights[3].specular", 1.0f, 1.0f, 1.0f);
-    shader.setFloat("pointLights[3].constant", 1.0f);
-    shader.setFloat("pointLights[3].linear", 0.09);
-    shader.setFloat("pointLights[3].quadratic", 0.032);
-    // spotLight
-    shader.setVec3("spotLight.position", camera.Position);
-    shader.setVec3("spotLight.direction", camera.Front);
-    shader.setVec3("spotLight.ambient", 0.0f, 0.0f, 0.0f);
-    shader.setVec3("spotLight.diffuse", 1.0f, 1.0f, 1.0f);
-    shader.setVec3("spotLight.specular", 1.0f, 1.0f, 1.0f);
-    shader.setFloat("spotLight.constant", 1.0f);
-    shader.setFloat("spotLight.linear", 0.09);
-    shader.setFloat("spotLight.quadratic", 0.032);
-    shader.setFloat("spotLight.cutOff", glm::cos(glm::radians(12.5f)));
-    shader.setFloat("spotLight.outerCutOff", glm::cos(glm::radians(15.0f)));
-}
-
 void createFloor(unsigned int &floorVAO) {
     float vertices[] = {
             // positions            // normals         // texcoords
@@ -840,21 +737,21 @@ void renderScene(const Shader &shader, unsigned int &floorVAO, unsigned int &ter
     glBindVertexArray(floorVAO);
     glDrawArrays(GL_TRIANGLES, 0, 6);
 
-////        TERRAIN
-//    shader.setVec3("viewPos", camera.Position);
-//    model = glm::mat4(1.0f);
-//        model = glm::translate(model, glm::vec3(
-//                -VERTEX_COUNT / 2.0 + (VERTEX_COUNT - 1) * 0,
-//                -7.0,
-//                -VERTEX_COUNT / 2.0 + (VERTEX_COUNT - 1) * 0
-//                               )
-//        );
-//        shader.setMat4("model", model);
-//
-////        glActiveTexture(GL_TEXTURE0);
-////        glBindTexture(GL_TEXTURE_2D, grassTexture);
-//    glBindVertexArray(terrainVAO);
-//    glDrawElements(GL_TRIANGLES, VERTEX_COUNT * VERTEX_COUNT * 6, GL_UNSIGNED_INT, nullptr);
+//        TERRAIN
+    shader.setVec3("viewPos", camera.Position);
+    model = glm::mat4(1.0f);
+    model = glm::translate(model, glm::vec3(
+            -VERTEX_COUNT / 2.0 + (VERTEX_COUNT - 1) * 0,
+            -7.0,
+            -VERTEX_COUNT / 2.0 + (VERTEX_COUNT - 1) * 0
+                           )
+    );
+    shader.setMat4("model", model);
+
+//        glActiveTexture(GL_TEXTURE0);
+//        glBindTexture(GL_TEXTURE_2D, grassTexture);
+    glBindVertexArray(terrainVAO);
+    glDrawElements(GL_TRIANGLES, VERTEX_COUNT * VERTEX_COUNT * 6, GL_UNSIGNED_INT, nullptr);
 
     // cubes
     model = glm::mat4(1.0f);
