@@ -40,6 +40,8 @@ float lacunarity = 2;
 
 glm::vec3 lightPos(1.2f, 1.0f, 2.0f);
 
+unsigned int diffuseMap, specularMap, grassTexture, containerTexture, rockTexture;
+
 void initGlfw();
 
 void framebufferSizeCallback(GLFWwindow *, int width, int height);
@@ -74,7 +76,7 @@ std::vector<float> generate_texture_coords(std::vector<float> vertices);
 
 void generate_map_chunk(unsigned int &VAO);
 
-void renderScene(const Shader &shader, unsigned int &planeVAO);
+void renderScene(const Shader &shader, unsigned int &floorVAO, unsigned int &terrianVAO);
 
 void renderCube();
 
@@ -105,57 +107,51 @@ int main() {
 //    SETUP END
 
 //    TEXTURES
-    unsigned int containerTexture = loadTexture("../../resources/textures/container.jpg");
-    unsigned int diffuseMap = loadTexture("../../resources/textures/container2.png");
-    unsigned int specularMap = loadTexture("../../resources/textures/container2_specular.png");
-    unsigned int grassTexture = loadTexture("../../resources/textures/grass.png");
-    unsigned int rockTexture = loadTexture("../../resources/textures/mountains.jpg");
-    unsigned int heightMap = loadTexture("../../resources/heightmap.bmp");
+    containerTexture = loadTexture("../../resources/textures/container.jpg");
+    diffuseMap = loadTexture("../../resources/textures/container2.png");
+    specularMap = loadTexture("../../resources/textures/container2_specular.png");
+    grassTexture = loadTexture("../../resources/textures/grass.png");
+    rockTexture = loadTexture("../../resources/textures/mountains.jpg");
 
 //    FLOOR
 //    Shader floorShader("../../resources/shaders/floor.vert", "../../resources/shaders/floor.frag");
     unsigned int floorVAO;
     createFloor(floorVAO);
 
-////    CUBE
-//    unsigned int cubeVAO, cubeVBO;
-//    createCube(cubeVAO, cubeVBO);
-//    glm::vec3 cubePositions[] = {glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(2.0f, 5.0f, -15.0f),
-//                                 glm::vec3(-1.5f, -2.2f, -2.5f), glm::vec3(-3.8f, -2.0f, -12.3f),
-//                                 glm::vec3(2.4f, -0.4f, -3.5f), glm::vec3(-1.7f, 3.0f, -7.5f),
-//                                 glm::vec3(1.3f, -2.0f, -2.5f), glm::vec3(1.5f, 2.0f, -2.5f),
-//                                 glm::vec3(1.5f, 0.2f, -1.5f), glm::vec3(-1.3f, 1.0f, -1.5f)};
-//
-////    LIGHT
-//    Shader lightShader("../../resources/shaders/light.vert", "../../resources/shaders/light.frag");
-//    lightShader.use();
-//    lightShader.setInt("material.diffuse", 0);
-//    lightShader.setInt("material.specular", 1);
-//
-////    TERRAIN
-//    unsigned int terrainVAO;
-//    generate_map_chunk(terrainVAO);
-//
-//    Shader terrainShader(
-//            "../../resources/shaders/terrain.vert",
-//            "../../resources/shaders/terrain.frag"
-//    );
-//    terrainShader.use();
-//    terrainShader.setBool("isFlat", true);
-//    terrainShader.setVec3("light.ambient", 0.3, 0.2, 0.2);
-//    terrainShader.setVec3("light.diffuse", 0.3, 0.3, 0.3);
-//    terrainShader.setVec3("light.specular", 1.0, 1.0, 1.0);
-//    terrainShader.setVec3("light.direction", -0.2f, -1.0f, -0.3f);
+//    CUBE
+    unsigned int cubesVAO, cubesVBO;
+    createCube(cubesVAO, cubesVBO);
 
-//    // SKYBOX
-//    unsigned int skyboxTexture, skyboxVAO, skyboxVBO;
-//    createSkybox(skyboxTexture, skyboxVAO, skyboxVBO);
-//    Shader skyboxShader(
-//            "../../resources/shaders/skybox.vert",
-//            "../../resources/shaders/skybox.frag"
-//    );
-//    skyboxShader.use();
-//    skyboxShader.setInt("skybox", 0);
+//    LIGHT
+    Shader lightShader("../../resources/shaders/light.vert", "../../resources/shaders/light.frag");
+    lightShader.use();
+    lightShader.setInt("material.diffuse", 0);
+    lightShader.setInt("material.specular", 1);
+
+//    TERRAIN
+    unsigned int terrainVAO;
+    generate_map_chunk(terrainVAO);
+
+    Shader terrainShader(
+            "../../resources/shaders/terrain.vert",
+            "../../resources/shaders/terrain.frag"
+    );
+    terrainShader.use();
+    terrainShader.setBool("isFlat", true);
+    terrainShader.setVec3("light.ambient", 0.3, 0.2, 0.2);
+    terrainShader.setVec3("light.diffuse", 0.3, 0.3, 0.3);
+    terrainShader.setVec3("light.specular", 1.0, 1.0, 1.0);
+    terrainShader.setVec3("light.direction", -0.2f, -1.0f, -0.3f);
+
+    // SKYBOX
+    unsigned int skyboxTexture, skyboxVAO, skyboxVBO;
+    createSkybox(skyboxTexture, skyboxVAO, skyboxVBO);
+    Shader skyboxShader(
+            "../../resources/shaders/skybox.vert",
+            "../../resources/shaders/skybox.frag"
+    );
+    skyboxShader.use();
+    skyboxShader.setInt("skybox", 0);
 
 //    DEPTH MAP
     Shader shader(
@@ -226,7 +222,7 @@ int main() {
         glClear(GL_DEPTH_BUFFER_BIT);
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, containerTexture);
-        renderScene(simpleDepthShader, floorVAO);
+        renderScene(simpleDepthShader, floorVAO, terrainVAO);
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
         // reset viewport
@@ -244,10 +240,10 @@ int main() {
         shader.setVec3("lightPos", lightPos);
         shader.setMat4("lightSpaceMatrix", lightSpaceMatrix);
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, containerTexture);
+        glBindTexture(GL_TEXTURE_2D, grassTexture);
         glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_2D, depthMap);
-        renderScene(shader, floorVAO);
+        renderScene(shader, floorVAO, terrainVAO);
 
         // render Depth map to quad for visual debugging
         // ---------------------------------------------
@@ -267,21 +263,6 @@ int main() {
 //        lightShader.setMat4("view", view);
 //        glm::mat4(1.0f);
 //        lightShader.setMat4("model", model);
-//
-////        CUBE
-//        glActiveTexture(GL_TEXTURE0);
-//        glBindTexture(GL_TEXTURE_2D, diffuseMap);
-//        glActiveTexture(GL_TEXTURE1);
-//        glBindTexture(GL_TEXTURE_2D, specularMap);
-//        glBindVertexArray(cubeVAO);
-//        for (unsigned int i = 0; i < 10; i++) {
-//            model = glm::mat4(1.0f);
-//            model = glm::translate(model, cubePositions[i]);
-//            float angle = 20.0f * i;
-//            model = glm::rotate(model, glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f));
-//            lightShader.setMat4("model", model);
-//            glDrawArrays(GL_TRIANGLES, 0, 36);
-//        }
 
 ////        TERRAIN
 //        terrainShader.use();
@@ -303,18 +284,18 @@ int main() {
 //        glBindVertexArray(terrainVAO);
 //        glDrawElements(GL_TRIANGLES, VERTEX_COUNT * VERTEX_COUNT * 6, GL_UNSIGNED_INT, nullptr);
 
-//        // SKYBOX
-//        glDepthFunc(GL_LEQUAL);
-//        skyboxShader.use();
-//        view = glm::mat4(glm::mat3(camera.GetViewMatrix()));
-//        skyboxShader.setMat4("view", view);
-//        skyboxShader.setMat4("projection", projection);
-//        glBindVertexArray(skyboxVAO);
-//        glActiveTexture(GL_TEXTURE0);
-//        glBindTexture(GL_TEXTURE_CUBE_MAP, skyboxTexture);
-//        glDrawArrays(GL_TRIANGLES, 0, 36);
-//        glBindVertexArray(0);
-//        glDepthFunc(GL_LESS);
+        // SKYBOX
+        glDepthFunc(GL_LEQUAL);
+        skyboxShader.use();
+        view = glm::mat4(glm::mat3(camera.GetViewMatrix()));
+        skyboxShader.setMat4("view", view);
+        skyboxShader.setMat4("projection", projection);
+        glBindVertexArray(skyboxVAO);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, skyboxTexture);
+        glDrawArrays(GL_TRIANGLES, 0, 36);
+        glBindVertexArray(0);
+        glDepthFunc(GL_LESS);
 
         // END
         glfwSwapBuffers(window);
@@ -852,12 +833,28 @@ void createFloor(unsigned int &floorVAO) {
     glBindVertexArray(0);
 }
 
-void renderScene(const Shader &shader, unsigned int &planeVAO) {
-    // floor
+void renderScene(const Shader &shader, unsigned int &floorVAO, unsigned int &terrainVAO) {
     glm::mat4 model = glm::mat4(1.0f);
+    // floor
     shader.setMat4("model", model);
-    glBindVertexArray(planeVAO);
+    glBindVertexArray(floorVAO);
     glDrawArrays(GL_TRIANGLES, 0, 6);
+
+////        TERRAIN
+//    shader.setVec3("viewPos", camera.Position);
+//    model = glm::mat4(1.0f);
+//        model = glm::translate(model, glm::vec3(
+//                -VERTEX_COUNT / 2.0 + (VERTEX_COUNT - 1) * 0,
+//                -7.0,
+//                -VERTEX_COUNT / 2.0 + (VERTEX_COUNT - 1) * 0
+//                               )
+//        );
+//        shader.setMat4("model", model);
+//
+////        glActiveTexture(GL_TEXTURE0);
+////        glBindTexture(GL_TEXTURE_2D, grassTexture);
+//    glBindVertexArray(terrainVAO);
+//    glDrawElements(GL_TRIANGLES, VERTEX_COUNT * VERTEX_COUNT * 6, GL_UNSIGNED_INT, nullptr);
 
     // cubes
     model = glm::mat4(1.0f);
@@ -876,6 +873,7 @@ void renderScene(const Shader &shader, unsigned int &planeVAO) {
     model = glm::scale(model, glm::vec3(0.25));
     shader.setMat4("model", model);
     renderCube();
+
 }
 
 unsigned int cubeVAO = 0;
@@ -945,6 +943,11 @@ void renderCube() {
         glBindVertexArray(0);
     }
     // render Cube
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, diffuseMap);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, specularMap);
+
     glBindVertexArray(cubeVAO);
     glDrawArrays(GL_TRIANGLES, 0, 36);
     glBindVertexArray(0);
