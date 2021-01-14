@@ -1,3 +1,7 @@
+/*
+ * Mostly taken from learnopenl.
+*/
+
 #ifndef SHADER_H
 #define SHADER_H
 
@@ -15,15 +19,18 @@ public:
 
     // constructor generates the shader on the fly
     // ------------------------------------------------------------------------
-    Shader(const char *vertexPath, const char *fragmentPath) {
+    Shader(const char *vertexPath, const char *fragmentPath, const char *geometryPath = nullptr) {
         // 1. retrieve the vertex/fragment source code from filePath
         std::string vertexCode;
         std::string fragmentCode;
+        std::string geometryCode;
         std::ifstream vShaderFile;
         std::ifstream fShaderFile;
+        std::ifstream gShaderFile;
         // ensure ifstream objects can throw exceptions:
         vShaderFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
         fShaderFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
+        gShaderFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
         try {
             // open files
             vShaderFile.open(vertexPath);
@@ -38,14 +45,26 @@ public:
             // convert stream into string
             vertexCode = vShaderStream.str();
             fragmentCode = fShaderStream.str();
+            // if geometry shader path is present, also load a geometry shader
+            if (geometryPath != nullptr) {
+                gShaderFile.open(geometryPath);
+                std::stringstream gShaderStream;
+                gShaderStream << gShaderFile.rdbuf();
+                gShaderFile.close();
+                geometryCode = gShaderStream.str();
+            }
         }
-        catch (std::ifstream::failure &e) {
+        catch (std::ifstream::failure e) {
             std::cout << "ERROR::SHADER::FILE_NOT_SUCCESFULLY_READ" << std::endl;
         }
         const char *vShaderCode = vertexCode.c_str();
         const char *fShaderCode = fragmentCode.c_str();
         // 2. compile shaders
         unsigned int vertex, fragment;
+        int success;
+        (void) success;
+        char infoLog[512];
+        (void) infoLog;
         // vertex shader
         vertex = glCreateShader(GL_VERTEX_SHADER);
         glShaderSource(vertex, 1, &vShaderCode, NULL);
@@ -56,15 +75,28 @@ public:
         glShaderSource(fragment, 1, &fShaderCode, NULL);
         glCompileShader(fragment);
         checkCompileErrors(fragment, "FRAGMENT");
+        // if geometry shader is given, compile geometry shader
+        unsigned int geometry;
+        if (geometryPath != nullptr) {
+            const char *gShaderCode = geometryCode.c_str();
+            geometry = glCreateShader(GL_GEOMETRY_SHADER);
+            glShaderSource(geometry, 1, &gShaderCode, NULL);
+            glCompileShader(geometry);
+            checkCompileErrors(geometry, "GEOMETRY");
+        }
         // shader Program
         ID = glCreateProgram();
         glAttachShader(ID, vertex);
         glAttachShader(ID, fragment);
+        if (geometryPath != nullptr)
+            glAttachShader(ID, geometry);
         glLinkProgram(ID);
         checkCompileErrors(ID, "PROGRAM");
         // delete the shaders as they're linked into our program now and no longer necessery
         glDeleteShader(vertex);
         glDeleteShader(fragment);
+        if (geometryPath != nullptr)
+            glDeleteShader(geometry);
 
     }
 
@@ -113,7 +145,7 @@ public:
         glUniform4fv(glGetUniformLocation(ID, name.c_str()), 1, &value[0]);
     }
 
-    void setVec4(const std::string &name, float x, float y, float z, float w) const {
+    void setVec4(const std::string &name, float x, float y, float z, float w) {
         glUniform4f(glGetUniformLocation(ID, name.c_str()), x, y, z, w);
     }
 
@@ -130,6 +162,17 @@ public:
     // ------------------------------------------------------------------------
     void setMat4(const std::string &name, const glm::mat4 &mat) const {
         glUniformMatrix4fv(glGetUniformLocation(ID, name.c_str()), 1, GL_FALSE, &mat[0][0]);
+    }
+
+    void updateView(float fov, float SRC_WIDTH, float SRC_HEIGHT, glm::mat4 view_matrix, bool cubemap) {
+        glm::mat4 projection = glm::perspective(glm::radians(fov), (float) SRC_WIDTH / (float) SRC_HEIGHT, 0.1f,
+                                                1000.0f);
+        this->setMat4("projection", projection);
+
+        if (cubemap)
+            view_matrix = glm::mat4(glm::mat3(view_matrix));
+
+        this->setMat4("view", view_matrix);
     }
 
 private:
@@ -157,3 +200,4 @@ private:
 };
 
 #endif
+
