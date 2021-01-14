@@ -14,6 +14,11 @@ const unsigned int SCR_WIDTH = 1200;
 const unsigned int SCR_HEIGHT = 900;
 const unsigned int SHADOW_WIDTH = 1024, SHADOW_HEIGHT = 1024;
 
+float opt_speed = 0.8f;
+float opt_amount = 0.01f;
+float opt_height = 0.5f;
+float rec_width = 0.5f;
+
 Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
 
 bool firstMouse = true;
@@ -29,7 +34,7 @@ glm::vec3 lightPos(-2.0f, 4.0f, -1.0f);
 
 unsigned int diffuseMap, specularMap, grassTexture, containerTexture, rockTexture;
 
-void initGlfw();
+int initOpengl();
 
 void framebufferSizeCallback(GLFWwindow *, int width, int height);
 
@@ -47,33 +52,24 @@ void createSkybox(unsigned int &texture, unsigned int &VAO, unsigned int &VBO);
 
 void createFloor(unsigned int &VAO);
 
+void createWater(unsigned int &waterVAO);
+
 void renderScene(const Shader &shader, unsigned int &floorVAO, unsigned int &terrainVAO);
 
 void renderCube();
 
 void renderQuad();
 
+std::vector<float> *init_plane(int size, float width, float height);
+
+std::vector<unsigned int> *init_indices(int size);
+
+unsigned int load_object(std::vector<float> *vertices, std::vector<unsigned int> *indices);
+
 int main() {
-    initGlfw();
-    window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "RAF RG Projekat", nullptr, nullptr);
-    if (window == nullptr) {
-        std::cout << "Failed to create GLFW window" << std::endl;
-        glfwTerminate();
+    if (initOpengl() != 0) {
         return -1;
     }
-    glfwMakeContextCurrent(window);
-    glfwSetCursorPosCallback(window, mouseCallback);
-    glfwSetScrollCallback(window, scrollCallback);
-    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-
-    glfwSetFramebufferSizeCallback(window, framebufferSizeCallback);
-    if (!gladLoadGLLoader((GLADloadproc) glfwGetProcAddress)) {
-        std::cout << "Failed to initialize GLAD" << std::endl;
-        return -1;
-    }
-    glEnable(GL_DEPTH_TEST);
-
-//    SETUP END
 
 //    TEXTURES
     containerTexture = loadTexture("../../resources/textures/container.jpg");
@@ -81,6 +77,7 @@ int main() {
     specularMap = loadTexture("../../resources/textures/container2_specular.png");
     grassTexture = loadTexture("../../resources/textures/grass.png");
     rockTexture = loadTexture("../../resources/textures/mountains.jpg");
+    unsigned int waterTexture = loadTexture("../../resources/textures/water.png");
 
 //    FLOOR
     unsigned int floorVAO;
@@ -106,6 +103,18 @@ int main() {
     terrainShader.setVec3("light.diffuse", 0.3, 0.3, 0.3);
     terrainShader.setVec3("light.specular", 1.0, 1.0, 1.0);
     terrainShader.setVec3("light.direction", -0.2f, -1.0f, -0.3f);
+
+//    WATER
+    Shader waterShader(
+            "../../resources/shaders/water.vert",
+            "../../resources/shaders/water.frag"
+    );
+    auto waterVertices = init_plane(VERTEX_COUNT, rec_width, 0.0f);
+    auto waterIndices = init_indices(VERTEX_COUNT);
+    unsigned int waterVAO = load_object(waterVertices, waterIndices);
+    waterShader.use();
+    waterShader.setInt("TexWater", 0);
+    waterShader.setInt("skybox", 2);
 
     // SKYBOX
     unsigned int skyboxTexture, skyboxVAO, skyboxVBO;
@@ -208,16 +217,16 @@ int main() {
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, depthMap);
 
-        renderScene(shader, floorVAO, terrainVAO);
-
-//        DEBUG
-//        debugDepthQuad.use();
-//        debugDepthQuad.setFloat("near_plane", near_plane);
-//        debugDepthQuad.setFloat("far_plane", far_plane);
-//        glActiveTexture(GL_TEXTURE0);
-//        glBindTexture(GL_TEXTURE_2D, depthMap);
-//        renderQuad();
-
+//        renderScene(shader, floorVAO, terrainVAO);
+//
+////        DEBUG
+////        debugDepthQuad.use();
+////        debugDepthQuad.setFloat("near_plane", near_plane);
+////        debugDepthQuad.setFloat("far_plane", far_plane);
+////        glActiveTexture(GL_TEXTURE0);
+////        glBindTexture(GL_TEXTURE_2D, depthMap);
+////        renderQuad();
+//
 //        TERRAIN
         terrainShader.use();
         terrainShader.setMat4("projection", projection);
@@ -234,6 +243,27 @@ int main() {
         terrainShader.setMat4("model", model);
         glBindVertexArray(terrainVAO);
         glDrawElements(GL_TRIANGLES, VERTEX_COUNT * VERTEX_COUNT * 6, GL_UNSIGNED_INT, nullptr);
+
+        model = glm::mat4(1.0f);
+        model = glm::translate(model, glm::vec3(
+                0.0f,
+                -25.0,
+                0.0f
+                               )
+        );
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, waterTexture);
+        waterShader.use();
+        waterShader.setMat4("projection", projection);
+        waterShader.updateView(camera.Zoom, SCR_WIDTH, SCR_HEIGHT, camera.GetViewMatrix(), false);
+        waterShader.setMat4("model", model);
+        waterShader.setVec3("cameraPos", camera.Position);
+        waterShader.setFloat("time", glfwGetTime());
+        waterShader.setFloat("speed", opt_speed);
+        waterShader.setFloat("amount", opt_amount);
+        waterShader.setFloat("height", opt_height);
+        glBindVertexArray(waterVAO);
+        glDrawElements(GL_TRIANGLES, waterIndices->size(), GL_UNSIGNED_INT, 0);
 
         // SKYBOX
         glDepthFunc(GL_LEQUAL);
@@ -270,14 +300,37 @@ void framebufferSizeCallback(GLFWwindow *, int width, int height) {
     glViewport(0, 0, width, height);
 }
 
-void initGlfw() {
+int initOpengl() {
     glfwInit();
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    glfwWindowHint(GLFW_SAMPLES, 4);
 #ifdef __APPLE__
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 #endif
+    window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "RAF RG Projekat", nullptr, nullptr);
+    if (window == nullptr) {
+        std::cout << "Failed to create GLFW window" << std::endl;
+        glfwTerminate();
+        return -1;
+    }
+    glfwMakeContextCurrent(window);
+    glfwSetCursorPosCallback(window, mouseCallback);
+    glfwSetScrollCallback(window, scrollCallback);
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+
+    glfwSetFramebufferSizeCallback(window, framebufferSizeCallback);
+    if (!gladLoadGLLoader((GLADloadproc) glfwGetProcAddress)) {
+        std::cout << "Failed to initialize GLAD" << std::endl;
+        return -1;
+    }
+    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_MULTISAMPLE);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    return 0;
 }
 
 void processInput(GLFWwindow *window) {
@@ -405,6 +458,36 @@ void createSkybox(unsigned int &texture, unsigned int &VAO, unsigned int &VBO) {
     glBufferData(GL_ARRAY_BUFFER, sizeof(skyboxVertices), skyboxVertices, GL_STATIC_DRAW);
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void *) 0);
+}
+
+void createWater(unsigned int &waterVAO) {
+    float waterSize = VERTEX_COUNT;
+//    float waterHeight = WATER_HEIGHT;
+    float waterHeight = 3.0f;
+
+    float vertices[] = {
+            // positions            // normals         // texcoords
+            waterSize, waterHeight, waterSize, 0.0f, 1.0f, 0.0f, waterSize, 0.0f,
+            -waterSize, waterHeight, waterSize, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f,
+            -waterSize, waterHeight, -waterSize, 0.0f, 1.0f, 0.0f, 0.0f, waterSize,
+
+            waterSize, waterHeight, waterSize, 0.0f, 1.0f, 0.0f, waterSize, 0.0f,
+            -waterSize, waterHeight, -waterSize, 0.0f, 1.0f, 0.0f, 0.0f, waterSize,
+            waterSize, waterHeight, -waterSize, 0.0f, 1.0f, 0.0f, waterSize, waterSize
+    };
+    unsigned int waterVBO;
+    glGenVertexArrays(1, &waterVAO);
+    glGenBuffers(1, &waterVBO);
+    glBindVertexArray(waterVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, waterVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void *) 0);
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void *) (3 * sizeof(float)));
+    glEnableVertexAttribArray(2);
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void *) (6 * sizeof(float)));
+    glBindVertexArray(0);
 }
 
 
@@ -577,4 +660,66 @@ void renderQuad() {
     glBindVertexArray(quadVAO);
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     glBindVertexArray(0);
+}
+
+std::vector<float> *init_plane(int size, float width, float height) {
+    auto vertices = new std::vector<float>();
+
+    float start = -(size / 2) * width;
+
+    for (int x = 0; x < size; x++) {
+        float pos_x = start + x * width;
+        for (int z = 0; z < size; z++) {
+            float pos_z = -(start + z * width);
+            vertices->push_back(pos_x);
+            vertices->push_back(height);
+            vertices->push_back(pos_z);
+
+            // Texture coordinates
+            vertices->push_back(pos_x);
+            vertices->push_back(pos_z);
+        }
+    }
+    return vertices;
+}
+
+std::vector<unsigned int> *init_indices(int size) {
+    auto indices = new std::vector<unsigned int>();
+
+    for (int z = 0; z < size - 1; ++z) {
+        for (int x = 0; x < size - 1; ++x) {
+            int start = x + z * size;
+            indices->push_back(start);
+            indices->push_back(start + 1);
+            indices->push_back(start + size);
+            indices->push_back(start + 1);
+            indices->push_back(start + 1 + size);
+            indices->push_back(start + size);
+        }
+    }
+
+    return indices;
+}
+
+unsigned int load_object(std::vector<float> *vertices, std::vector<unsigned int> *indices) {
+    unsigned int VBO, VAO, EBO;
+    glGenVertexArrays(1, &VAO);
+    glGenBuffers(1, &VBO);
+    glGenBuffers(1, &EBO);
+    glBindVertexArray(VAO);
+
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glBufferData(GL_ARRAY_BUFFER, vertices->size() * sizeof(float), &vertices->at(0), GL_STATIC_DRAW);
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices->size() * sizeof(unsigned int), &indices->at(0), GL_STATIC_DRAW);
+
+    // Position attributes
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void *) 0);
+    glEnableVertexAttribArray(0);
+
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void *) (3 * sizeof(float)));
+    glEnableVertexAttribArray(1);
+
+    return VAO;
 }
