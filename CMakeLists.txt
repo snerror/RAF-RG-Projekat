@@ -34,6 +34,7 @@ set(
         src/model.h
         src/map_generator.h
         src/utils.h
+        src/water.h
 )
 
 add_executable(${PROJECT_NAME} ${PROJECT_SOURCES})
