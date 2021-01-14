@@ -32,7 +32,7 @@ set(
         src/camera.h
         src/mesh.h
         src/model.h
-)
+        src/map_generator.h)
 
 add_executable(${PROJECT_NAME} ${PROJECT_SOURCES})
 

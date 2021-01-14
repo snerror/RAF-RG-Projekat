@@ -10,7 +10,7 @@ double grad(int hash, double x, double y, double z) {
 }
 
 double perlin_noise(float x, float y, std::vector<int> &p) {
-    int z = 0.5;
+    int z = static_cast<int>(0.5);
 
     int X = (int) floor(x) & 255,                  // FIND UNIT CUBE THAT
     Y = (int) floor(y) & 255,                  // CONTAINS POINT.
