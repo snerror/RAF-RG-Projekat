@@ -10,8 +10,8 @@
 #include "camera.h"
 #include "map_generator.h"
 
-const unsigned int SCR_WIDTH = 800;
-const unsigned int SCR_HEIGHT = 600;
+const unsigned int SCR_WIDTH = 1200;
+const unsigned int SCR_HEIGHT = 900;
 const unsigned int SHADOW_WIDTH = 1024, SHADOW_HEIGHT = 1024;
 
 Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
@@ -25,7 +25,7 @@ float lastFrame = 0.0f;
 
 GLFWwindow *window = nullptr;
 
-glm::vec3 lightPos(1.2f, 1.0f, 2.0f);
+glm::vec3 lightPos(-2.0f, 4.0f, -1.0f);
 
 unsigned int diffuseMap, specularMap, grassTexture, containerTexture, rockTexture;
 
@@ -47,7 +47,7 @@ void createSkybox(unsigned int &texture, unsigned int &VAO, unsigned int &VBO);
 
 void createFloor(unsigned int &VAO);
 
-void renderScene(const Shader &shader, unsigned int &floorVAO, unsigned int &terrianVAO);
+void renderScene(const Shader &shader, unsigned int &floorVAO, unsigned int &terrainVAO);
 
 void renderCube();
 
@@ -119,8 +119,8 @@ int main() {
 
 //    DEPTH MAP
     Shader shader(
-            "../../resources/shaders/shadow_mapping.vert",
-            "../../resources/shaders/shadow_mapping.frag"
+            "../../resources/shaders/main.vert",
+            "../../resources/shaders/main.frag"
     );
     Shader simpleDepthShader(
             "../../resources/shaders/shadow_depth.vert",
@@ -149,13 +149,11 @@ int main() {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     shader.use();
-    shader.setInt("diffuseTexture", 0);
-    shader.setInt("shadowMap", 1);
+    shader.setInt("shadowMap", 0);
+    shader.setInt("material.diffuse", 1);
 
     debugDepthQuad.use();
     debugDepthQuad.setInt("depthMap", 0);
-
-    glm::vec3 lightPos(-2.0f, 4.0f, -1.0f);
 
 //    RENDER LOOP
     while (!glfwWindowShouldClose(window)) {
@@ -166,6 +164,8 @@ int main() {
 
         // INPUT
         processInput(window);
+
+        lightPos.z = sin(glfwGetTime() * 0.5) * 3.0;
 
         // RENDER
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
@@ -199,24 +199,23 @@ int main() {
         glm::mat4 view = camera.GetViewMatrix();
         shader.setMat4("projection", projection);
         shader.setMat4("view", view);
-        // set light uniforms
         shader.setVec3("viewPos", camera.Position);
-        shader.setVec3("lightPos", lightPos);
+        shader.setVec3("light.position", lightPos);
         shader.setMat4("lightSpaceMatrix", lightSpaceMatrix);
+        shader.setVec3("light.ambient", 0.0f, 0.0f, 0.0f);
+        shader.setVec3("light.diffuse", 1.0f, 1.0f, 1.0f);
+        shader.setVec3("light.specular", 1.0f, 1.0f, 1.0f);
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, grassTexture);
-        glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_2D, depthMap);
-//        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
         renderScene(shader, floorVAO, terrainVAO);
 
-        // render Depth map to quad for visual debugging
-        // ---------------------------------------------
-        debugDepthQuad.use();
-        debugDepthQuad.setFloat("near_plane", near_plane);
-        debugDepthQuad.setFloat("far_plane", far_plane);
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, depthMap);
+//        DEBUG
+//        debugDepthQuad.use();
+//        debugDepthQuad.setFloat("near_plane", near_plane);
+//        debugDepthQuad.setFloat("far_plane", far_plane);
+//        glActiveTexture(GL_TEXTURE0);
+//        glBindTexture(GL_TEXTURE_2D, depthMap);
 //        renderQuad();
 
 //        TERRAIN
@@ -410,15 +409,16 @@ void createSkybox(unsigned int &texture, unsigned int &VAO, unsigned int &VBO) {
 
 
 void createFloor(unsigned int &floorVAO) {
+    float floorSize = 10.0f;
     float vertices[] = {
             // positions            // normals         // texcoords
-            25.0f, -0.5f, 25.0f, 0.0f, 1.0f, 0.0f, 25.0f, 0.0f,
-            -25.0f, -0.5f, 25.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f,
-            -25.0f, -0.5f, -25.0f, 0.0f, 1.0f, 0.0f, 0.0f, 25.0f,
+            floorSize, -0.5f, floorSize, 0.0f, 1.0f, 0.0f, floorSize, 0.0f,
+            -floorSize, -0.5f, floorSize, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f,
+            -floorSize, -0.5f, -floorSize, 0.0f, 1.0f, 0.0f, 0.0f, floorSize,
 
-            25.0f, -0.5f, 25.0f, 0.0f, 1.0f, 0.0f, 25.0f, 0.0f,
-            -25.0f, -0.5f, -25.0f, 0.0f, 1.0f, 0.0f, 0.0f, 25.0f,
-            25.0f, -0.5f, -25.0f, 0.0f, 1.0f, 0.0f, 25.0f, 25.0f
+            floorSize, -0.5f, floorSize, 0.0f, 1.0f, 0.0f, floorSize, 0.0f,
+            -floorSize, -0.5f, -floorSize, 0.0f, 1.0f, 0.0f, 0.0f, floorSize,
+            floorSize, -0.5f, -floorSize, 0.0f, 1.0f, 0.0f, floorSize, floorSize
     };
     unsigned int floorVBO;
     glGenVertexArrays(1, &floorVAO);
@@ -436,28 +436,27 @@ void createFloor(unsigned int &floorVAO) {
 }
 
 void renderScene(const Shader &shader, unsigned int &floorVAO, unsigned int &terrainVAO) {
+    shader.use();
     glm::mat4 model = glm::mat4(1.0f);
-//    // floor
+
+    // floor
     shader.setMat4("model", model);
+    shader.setVec3("light.ambient", 0.2f, 0.2f, 0.2f);
+    shader.setVec3("light.specular", 0.0f, 0.0f, 1.0f);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, grassTexture);
     glBindVertexArray(floorVAO);
     glDrawArrays(GL_TRIANGLES, 0, 6);
 
-////        TERRAIN
-//    shader.setVec3("viewPos", camera.Position);
-//    model = glm::mat4(1.0f);
-//    model = glm::translate(model, glm::vec3(
-//            -VERTEX_COUNT / 2.0 + (VERTEX_COUNT - 1) * 0,
-//            -7.0,
-//            -VERTEX_COUNT / 2.0 + (VERTEX_COUNT - 1) * 0
-//                           )
-//    );
-//    shader.setMat4("model", model);
-//
-////        glActiveTexture(GL_TEXTURE0);
-////        glBindTexture(GL_TEXTURE_2D, grassTexture);
-//    glBindVertexArray(terrainVAO);
-//    glDrawElements(GL_TRIANGLES, VERTEX_COUNT * VERTEX_COUNT * 6, GL_UNSIGNED_INT, nullptr);
-
+//  LIGHT TRACKER
+    shader.setVec3("light.ambient", 0.0f, 0.0f, 0.0f);
+    shader.setVec3("light.specular", 1.0f, 1.0f, 1.0f);
+    model = glm::mat4(1.0f);
+    model = glm::translate(model, lightPos);
+    model = glm::scale(model, glm::vec3(0.1f));
+    shader.setMat4("model", model);
+    shader.setFloat("material.shininess", 0.5f);
+    renderCube();
     // cubes
     model = glm::mat4(1.0f);
     model = glm::translate(model, glm::vec3(0.0f, 1.5f, 0.0));
@@ -545,10 +544,10 @@ void renderCube() {
         glBindVertexArray(0);
     }
     // render Cube
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, diffuseMap);
     glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, specularMap);
+    glBindTexture(GL_TEXTURE_2D, diffuseMap);
+//    glActiveTexture(GL_TEXTURE2);
+//    glBindTexture(GL_TEXTURE_2D, specularMap);
 
     glBindVertexArray(cubeVAO);
     glDrawArrays(GL_TRIANGLES, 0, 36);
