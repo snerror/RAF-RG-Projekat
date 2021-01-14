@@ -100,13 +100,12 @@ int main() {
             "../../resources/shaders/water.vert",
             "../../resources/shaders/water.frag"
     );
-    auto waterVertices = water.initVertices(VERTEX_COUNT, rec_width, 0.0f);
-    auto waterIndices = water.initIndices(VERTEX_COUNT);
+    auto waterVertices = water.initVertices(VERTEX_COUNT * 2, rec_width, -25.0f);
+    auto waterIndices = water.initIndices(VERTEX_COUNT * 2);
     unsigned int waterVAO = water.createVAO(waterVertices, waterIndices);
 
     waterShader.use();
     waterShader.setInt("TexWater", 0);
-    waterShader.setInt("skybox", 2);
 
     // SKYBOX
     unsigned int skyboxTexture, skyboxVAO, skyboxVBO;
@@ -236,24 +235,29 @@ int main() {
         glBindVertexArray(terrainVAO);
         glDrawElements(GL_TRIANGLES, VERTEX_COUNT * VERTEX_COUNT * 6, GL_UNSIGNED_INT, nullptr);
 
+//        WATER
         model = glm::mat4(1.0f);
+        view = camera.GetViewMatrix();
         model = glm::translate(model, glm::vec3(
                 0.0f,
-                -25.0,
+                -25.5,
                 0.0f
-                               )
+                )
         );
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, waterTexture);
         waterShader.use();
         waterShader.setMat4("projection", projection);
-        waterShader.updateView(camera.Zoom, SCR_WIDTH, SCR_HEIGHT, camera.GetViewMatrix(), false);
+        waterShader.setMat4("view", view);
+//        waterShader.updateView(camera.Zoom, SCR_WIDTH, SCR_HEIGHT, camera.GetViewMatrix(), false);
         waterShader.setMat4("model", model);
-        waterShader.setVec3("cameraPos", camera.Position);
+        waterShader.setVec3("viewPos", camera.Position);
+
         waterShader.setFloat("time", glfwGetTime());
         waterShader.setFloat("speed", opt_speed);
         waterShader.setFloat("amount", opt_amount);
         waterShader.setFloat("height", opt_height);
+
+//        glActiveTexture(GL_TEXTURE0);
+//        glBindTexture(GL_TEXTURE_2D, waterTexture);
         glBindVertexArray(waterVAO);
         glDrawElements(GL_TRIANGLES, waterIndices->size(), GL_UNSIGNED_INT, 0);
 
@@ -392,36 +396,6 @@ void createSkybox(unsigned int &texture, unsigned int &VAO, unsigned int &VBO) {
     glBufferData(GL_ARRAY_BUFFER, sizeof(skyboxVertices), skyboxVertices, GL_STATIC_DRAW);
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void *) 0);
-}
-
-void createWater(unsigned int &waterVAO) {
-    float waterSize = VERTEX_COUNT;
-//    float waterHeight = WATER_HEIGHT;
-    float waterHeight = 3.0f;
-
-    float vertices[] = {
-            // positions            // normals         // texcoords
-            waterSize, waterHeight, waterSize, 0.0f, 1.0f, 0.0f, waterSize, 0.0f,
-            -waterSize, waterHeight, waterSize, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f,
-            -waterSize, waterHeight, -waterSize, 0.0f, 1.0f, 0.0f, 0.0f, waterSize,
-
-            waterSize, waterHeight, waterSize, 0.0f, 1.0f, 0.0f, waterSize, 0.0f,
-            -waterSize, waterHeight, -waterSize, 0.0f, 1.0f, 0.0f, 0.0f, waterSize,
-            waterSize, waterHeight, -waterSize, 0.0f, 1.0f, 0.0f, waterSize, waterSize
-    };
-    unsigned int waterVBO;
-    glGenVertexArrays(1, &waterVAO);
-    glGenBuffers(1, &waterVBO);
-    glBindVertexArray(waterVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, waterVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void *) 0);
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void *) (3 * sizeof(float)));
-    glEnableVertexAttribArray(2);
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void *) (6 * sizeof(float)));
-    glBindVertexArray(0);
 }
 
 

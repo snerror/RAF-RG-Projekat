@@ -10,18 +10,15 @@ uniform vec3 cameraPos;
 
 void main()
 {
-    vec4 tmp = texture(TexWater, TexCoord);
-    FragColor = vec4(tmp.rgb, 0.9f);
+    FragColor = vec4(60/ 255.0, 95 / 255.0, 190 / 255.0, 1.0f);
 
     vec3 Normals = normalize(cross(dFdx(vertexPos), dFdy(vertexPos)));
 
     float ratio = 1.00 / 1.33;
     vec3 I = normalize(vertexPos - cameraPos);
     vec3 refraction = refract(I, normalize(-Normals), ratio);
-    //    FragColor *= vec4(texture(skybox, refraction).rgb, 1.0);
 
     vec3 reflection = reflect(I, normalize(-Normals));
-    //    FragColor *= vec4(texture(skybox, reflection).rgb, 1.0);
 
     vec3 diffuse = vec3(-1.0, -1.0, -1.0);
     float attenuation =  dot(-normalize(cross(dFdx(vertexPos), dFdy(vertexPos))), diffuse);
@@ -31,6 +28,6 @@ void main()
     vec3 sunrise_ambiant = 0.4 * vec3(0.713, 0.494, 0.356);
 
     FragColor.xyz *= (hazy_ambiant + attenuation);
-    FragColor.a = 0.3;
+    FragColor.a = 0.7;
 
 }
