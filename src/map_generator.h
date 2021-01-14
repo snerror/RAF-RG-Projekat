@@ -112,7 +112,7 @@ std::vector<float> generateNormals(const std::vector<int> &indices, const std::v
     int pos;
     glm::vec3 normal;
     std::vector<float> normals;
-    std::vector <glm::vec3> verts;
+    std::vector<glm::vec3> verts;
 
     // Get the vertices of each triangle in mesh
     // For each group of indices
@@ -154,7 +154,7 @@ struct terrainColor {
 
 std::vector<float> generateColors(const std::vector<float> &vertices) {
     std::vector<float> colors;
-    std::vector <terrainColor> biomeColors;
+    std::vector<terrainColor> biomeColors;
     glm::vec3 color = get_color(255, 255, 255);
 
     // NOTE: Terrain color height is a value between 0 and 1

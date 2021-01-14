@@ -165,6 +165,8 @@ int main() {
         // INPUT
         processInput(window);
 
+        generateMap(terrainVAO);
+
         lightPos.z = sin(glfwGetTime() * 0.5) * 3.0;
 
         // RENDER
